@@ -1,0 +1,51 @@
+#pragma once
+#include <atomic>
+#include <memory>
+
+#include "app_module.hpp"
+#include "c3/core.hpp"
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+namespace c3::device
+{
+struct UiSnapshot
+{
+    View view = View::home;
+    uint8_t selected = 0;
+    Settings settings{};
+    bool animating = false;
+    uint32_t events = 0, stopwatch_ms = 0, countdown_seconds = 300;
+    bool stopwatch_running = false, countdown_running = false;
+};
+struct Runtime
+{
+    Settings initial_settings{};
+    QueueHandle_t keys = nullptr, settings = nullptr;
+    std::atomic<uint32_t> key_events{0}, key_drops{0}, input_late{0};
+    std::atomic<uint8_t> stable_keys{0};
+    std::atomic<uint32_t> frames{0}, skipped{0}, display_errors{0}, frame_us{0};
+    void publish_ui(const UiSnapshot& next)
+    {
+        portENTER_CRITICAL(&ui_lock_);
+        ui_ = next;
+        portEXIT_CRITICAL(&ui_lock_);
+    }
+    UiSnapshot ui_snapshot()
+    {
+        portENTER_CRITICAL(&ui_lock_);
+        const auto copy = ui_;
+        portEXIT_CRITICAL(&ui_lock_);
+        return copy;
+    }
+
+   private:
+    portMUX_TYPE ui_lock_ = portMUX_INITIALIZER_UNLOCKED;
+    UiSnapshot ui_{};
+};
+std::unique_ptr<AppModule> create_storage(Runtime& runtime);
+std::unique_ptr<AppModule> create_network();
+std::unique_ptr<AppModule> create_probe();
+std::unique_ptr<AppModule> create_input(Runtime& runtime);
+std::unique_ptr<AppModule> create_ui(Runtime& runtime);
+std::unique_ptr<AppModule> create_console(Runtime& runtime);
+}  // namespace c3::device

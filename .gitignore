@@ -1,0 +1,9 @@
+build/
+sdkconfig
+sdkconfig.old
+sdkconfig.local
+compile_commands.json
+__pycache__/
+*.pyc
+.project-stage-*.json
+build-*.log

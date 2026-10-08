@@ -1,0 +1,108 @@
+menu "C3 GameBox"
+    menu "Board wiring (Super Mini)"
+        config C3_OLED_SCLK
+            int "OLED SCK GPIO"
+            range 0 21
+            default 4
+        config C3_OLED_MOSI
+            int "OLED MOSI GPIO (no MISO)"
+            range 0 21
+            default 6
+        config C3_OLED_CS
+            int "OLED CS GPIO"
+            range 0 21
+            default 7
+        config C3_OLED_DC
+            int "OLED D/C GPIO"
+            range 0 21
+            default 10
+        config C3_OLED_RESET
+            int "OLED RES GPIO"
+            range 0 21
+            default 5
+        config C3_OLED_CLOCK_MHZ
+            int "OLED SPI clock MHz"
+            range 1 10
+            default 8
+        config C3_KEY_UP
+            int "Up GPIO (-1 = disabled)"
+            range -1 21
+            default 0
+        config C3_KEY_DOWN
+            int "Down GPIO (-1 = disabled)"
+            range -1 21
+            default 1
+        config C3_KEY_ENTER
+            int "Enter GPIO (-1 = disabled)"
+            range -1 21
+            default 3
+        config C3_KEY_BACK
+            int "Back GPIO (-1 = disabled)"
+            range -1 21
+            default -1
+        config C3_KEY_LEFT
+            int "Left GPIO (-1 = disabled)"
+            range -1 21
+            default -1
+        config C3_KEY_RIGHT
+            int "Right GPIO (-1 = disabled)"
+            range -1 21
+            default -1
+        config C3_KEY_FUNCTION
+            int "Function GPIO (-1 = disabled)"
+            range -1 21
+            default -1
+        config C3_KEY_JUMP
+            int "Jump GPIO (-1 = disabled)"
+            range -1 21
+            default -1
+        config C3_SWD_CLK
+            int "Target SWCLK GPIO"
+            range 0 21
+            default 20
+        config C3_SWD_IO
+            int "Target SWDIO GPIO"
+            range 0 21
+            default 21
+        config C3_SWD_RESET
+            int "Target NRST GPIO (-1 = not connected)"
+            range -1 21
+            default -1
+        config C3_ALLOW_STRAPPING_PINS
+            bool "Allow external use of GPIO2/8/9 (check boot levels)"
+            default n
+            help
+                These pins affect boot. GPIO8 also drives the onboard LED;
+                GPIO9 is the BOOT button. Defaults leave them unused.
+    endmenu
+    menu "Network"
+        config C3_WIFI_SSID
+            string "Initial station SSID (empty = AP only)"
+            default ""
+        config C3_WIFI_PASSWORD
+            string "Initial station password"
+            default ""
+        config C3_AP_PASSWORD
+            string "AP password (empty = generate and persist automatically)"
+            default ""
+        config C3_TIMEZONE
+            string "POSIX timezone"
+            default "CST-8"
+        config C3_NTP_SERVER
+            string "Primary SNTP server"
+            default "ntp.aliyun.com"
+        config C3_NTP_SERVER_BACKUP
+            string "Backup SNTP server"
+            default "pool.ntp.org"
+    endmenu
+    menu "Scheduling"
+        config C3_INPUT_PERIOD_MS
+            int "Button sampling period ms"
+            range 1 10
+            default 5
+        config C3_UI_PERIOD_MS
+            int "UI scheduling period ms"
+            range 5 20
+            default 5
+    endmenu
+endmenu
