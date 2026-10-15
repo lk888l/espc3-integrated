@@ -1,5 +1,90 @@
 # 验证记录
 
+## 2026-10-15：俄罗斯方块单击延迟缩短，固件 1.1.2
+
+Tetris 的 Enter 单击/双击判定窗口从 280 ms 缩短到 150 ms，
+其余页面和按键保持 280 ms。输入任务从 UI 快照选取窗口，首次释放时锁存，
+避免切页改变已开始手势的判定时限；单双击保持互斥。
+
+- 七组 ASan/UBSan CTest 全部通过：真实 ButtonBank 在释放后 149 ms 不产生单击、
+  150 ms 产生一次单击；覆盖其他按键仍为 280 ms、跨页锁存、双击及计时回绕。
+- `/dev/ttyACM0` 烧录及哈希校验通过。
+- 新固件 `tetris_smoke.py` 六项串口功能检查通过，单击、双击、长按和继续行为正确，
+  drops=0、SPI errors=0，结束回 Games 主卡。串口注入最终手势验证动作，
+  判定耗时由主机 ButtonBank 采样序列验证。
+
+应用 bin 为 948528 字节，SHA-256：
+
+~~~text
+fd133544b27c725232c38f1083a89e1d347a379cac9efa108072d5bc7b99e394
+~~~
+
+日志 `build-tetris-latency-host.log`、`build-tetris-latency.log`、
+`build-tetris-latency-flash.log`；实机结果在 `build/hardware/tetris-latency/`。
+
+## 2026-10-15：俄罗斯方块单双击修复，固件 1.1.1
+
+修正 Enter 在 Pressed 时提前旋转、双击硬降夹带两次旋转的问题。
+现在单击确认后旋转一次（默认松开后等待 280 ms），双击只硬降并保持朝向，
+长按只暂停；开始和继续的尾随点击不会操作方块。
+
+- 完整七组 CTest，ASan/UBSan 全部通过。
+- 新增 `tetris_input_tests` 使用真实 ButtonBank 去抖和手势序列：
+  旧引擎在双击第一次按下后的画面不变断言失败，新引擎通过；
+  覆盖单双击互斥、硬降画面与 Function 基准一致、长按、开始/继续边界、
+  等待中的单击与下一次按下/释放交错、连续手势及计时回绕。
+- `/dev/ttyACM0` 烧录成功，哈希校验通过。
+- `tetris_smoke.py` 六项实机串口检查通过；双击的四次按下/释放均未旋转，
+  只在最终 DoubleClick 时硬降；单击、长按及继续的朝向检查通过。
+  SPI errors=0、drops=0，结束回 Games 主卡，设置与 Wi-Fi 保持。
+
+应用 bin 为 948352 字节，SHA-256：
+
+~~~text
+ef4ec60b423232d314c5fac7a1dd0999cacb70cd3635294a2da25c89dc790d2e
+~~~
+
+日志 `build-tetris-host.log`、`build-tetris-fix.log`、`build-tetris-flash.log`，
+实机结果 `build/hardware/tetris-smoke.json` 与 `tetris-smoke.log`。
+
+## 2026-10-15：八款游戏，固件 1.1.0
+
+移植 Dino、Snake、Air Raid、Tetris、Pong、Piano，新增 Breakout 和 Flappy。
+主页改为 Games / Tools / Network / Clock / Settings。
+
+| 检查 | 结果 |
+| --- | --- |
+| ESP-IDF Docker 编译、目标 esp32c3 | 通过，原 sdkconfig 错选 esp32s3 已重新生成，旧配置备份在 build/sdkconfig.before-games |
+| 完整六组 CTest，ASan/UBSan、警告作为错误 | 全部通过 |
+| game_tests 真实玩法 | Dino 跳障碍/碰撞、Snake 吃食/碰墙、Air 射击/三命、Tetris 三块消行、Pong 终局、Piano 音符/时长、Breakout 打砖/三命、Flappy 过管/碰撞均通过 |
+| game_tests 稳定性 | 八款共 48,000 次随机输入确定性重放，覆盖 uint32 时间回绕与转场偏移渲染；暂停画面、分数与模拟保持不变 |
+| USB 烧录 /dev/ttyACM0 | 成功，esptool 哈希校验通过，芯片 ESP32-C3 |
+| 最终镜像与设备 Flash | verify_flash 比对全部 948000 字节，digest matched |
+| game_smoke.py | 11 项通过；八款开始、三键输入、暂停、恢复、退出与重进；40 次菜单输入无丢失 |
+| serial_smoke.py | 原功能六组通过，计时器、五主页、设置与热点身份重启持久化、Wi-Fi/DAP 启停；原设置已恢复 |
+| 画面 | 最终固件相同的 C++ 渲染器导出，游戏及操作提示 PNG 已生成并查看 |
+
+游戏回归的空闲堆采样最低 147472 字节，结束 147816 字节；
+UI 任务 8192 字节栈的历史最低余量 4524 字节。
+按键队列 drops=0，SPI errors=0，Wi-Fi 与原设置保持。
+GameSession / BonusSession 主机占用分别为 356 / 60 字节，游戏状态使用固定数组。
+
+最终应用 bin 为 948000 字节，3 MiB 应用分区约剩 70%；
+静态 DRAM 129990 字节（40.46%）。应用 bin SHA-256：
+
+~~~text
+0790d15d06052e3159e0544acdff1a2acd41bced722e39bf72a44441dc7322f9
+~~~
+
+构建/烧录日志 `build-game-flash.log`，资源统计 `build-game-size.log`，
+主机测试 `build-game-host.log`，镜像比对 `build-game-verify.log`，
+实机日志及 JSON 在 `build/hardware/`。设备最终停在 Games 主页，DAP 关闭。
+操作说明与按键映射见 [README 游戏章节](../README.md#游戏)。
+串口回归验证真实设备上的固件模型和驱动提交；实体按键手感、OLED 可见画面与
+可选蜂鸣器声音未在本轮直接观察。Piano 默认未配置蜂鸣器，保持无声。
+
+## 2026-10-08：原菜单、网络与无线调试
+
 日期：2026-10-08。目标为用户通过 /dev/ttyACM0 连接的 ESP32-C3 Super Mini。
 芯片 ESP32-C3 QFN32 rev v0.4，原生 USB Serial/JTAG；
 esptool 读出的板载 Flash 为 XMC 4 MiB，晶振 40 MHz。

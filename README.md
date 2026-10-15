@@ -5,7 +5,9 @@ ESP32-C3 Super Mini / ESP-IDF 5.5.4 / C++20。SSD1306 **128×64 四线 SPI**，
 
 已实现：
 
-- 四卡片主页 Tools / Network / Clock / Settings，横向轮播、双页滑入、弹性光标和滚动；
+- 五卡片主页 Games / Tools / Network / Clock / Settings，横向轮播、双页滑入、弹性光标和滚动；
+- STM-GameBox 的 Dino、Snake、Air Raid、Tetris、Pong、Piano，适配三键操作；
+- 新增 Breakout 打砖块、Flappy 飞鸟，八款统一开始、暂停、重开与返回；
 - 独立高优先级按键任务：5 ms 采样、20 ms 去抖，Pressed 立即操作，
   长按、重复、单击、双击、组合返回和队列统计；
 - Stopwatch、Countdown、Input Lab、System、Wi-Fi DAP、About；
@@ -16,7 +18,38 @@ ESP32-C3 Super Mini / ESP-IDF 5.5.4 / C++20。SSD1306 **128×64 四线 SPI**，
 
 按用户确认选择 **Wi-Fi CMSIS-DAP/SWD 调试外部 MCU**。
 本 ESP32-C3 的日志和配置通过原生 USB Serial/JTAG 控制台访问。
-主页功能按本工程需求调整；参考工程的六款游戏没有移植。
+游戏从 Games 卡片进入；原有工具、网络、时钟及设置继续可用。
+
+## 游戏
+
+![八款游戏实际渲染器预览](docs/previews/games-game.png)
+
+进入游戏后先显示操作说明，按 Enter 开始。**长按 Enter 暂停**，
+暂停后 Enter 继续、Up 重开；失败后 Enter 回到开始画面。
+**同时按 Up+Down 返回游戏列表**，再按一次返回主页。
+Tetris 长按 Enter 只暂停；其他游戏长按前会先执行对应的按下动作。
+
+| 游戏 | Up / Down | Enter |
+| --- | --- | --- |
+| Dino | Up 跳跃 | 跳跃 |
+| Snake | 相对当前朝向左转 / 右转 | 长按暂停 |
+| Air Raid | 上移 / 下移，可按住 | 发射子弹 |
+| Tetris | 左移 / 右移 | 单击旋转；双击硬降 |
+| Pong | 左侧球拍上移 / 下移，可按住 | 长按暂停 |
+| Piano | 选择前一个 / 后一个音符 | 弹奏 |
+| Breakout | 球拍左移 / 右移 | 发球 |
+| Flappy | Up 扇翅 | 扇翅 |
+
+Pong 默认对战电脑；配置扩展 Left / Right 键后，首次按下它们即切换为双人模式，
+由这两个键控制右侧球拍。三键 Snake 使用相对转向。
+Tetris 在松开 Enter 并确认单击后旋转（双击判定窗口 150 ms）；
+双击直接硬降，保持当前朝向；长按只暂停。
+
+Piano 默认仅显示八个琴键和弹奏反馈。声音需要外接**无源蜂鸣器**，在
+menuconfig → C3 GameBox → Board wiring 中设置 `C3_BUZZER_GPIO`，默认 -1 禁用。
+引脚必须空闲并通过现有冲突检查；默认接线已使用全部非启动配置 GPIO，
+需调整接线或按实际启动电平允许 GPIO2/8/9。蜂鸣器驱动使用 LEDC PWM，
+单音 180 ms，暂停和退出立即静音。
 
 ## 菜单预览
 
@@ -61,7 +94,7 @@ USB 占用或未经允许的启动配置脚会触发编译错误。
 
 - Up / Down 切换卡片或列表；Enter 立即确认，动画不锁输入。
 - **同时按 Up+Down 返回**，默认没有独立 Back 键。
-- 长按 Enter 也能返回，但它会先执行 Pressed 的确认，优先使用 Up+Down。
+- 普通页面长按 Enter 返回；游戏页面长按 Enter 暂停。
 - Stopwatch：Enter 启停，Up 清零。Countdown：停止时 Up/Down 调分钟，Enter 启停。
 - Clock / Network：Enter 请求校时。需要 STA 接入互联网，设备热点本身不能校时。
 - Settings：Enter 循环动画 Off / Reduced / Full、四档亮度、
@@ -148,12 +181,19 @@ USB 连接实板后，可运行集成测试；串口脚本使用 SDK 环境里�
 docker exec -w /workspace/espc3-integrated esp-dev bash -lc \
   'source /opt/esp-idf/export.sh && python tools/serial_smoke.py --port /dev/ttyACM0'
 python3 tools/wifi_smoke.py --host 设备的STA地址
+docker exec -w /workspace/espc3-integrated esp-dev bash -lc \
+  'source /opt/esp-idf/export.sh && python tools/game_smoke.py --port /dev/ttyACM0'
 ~~~
 
 串口集成测试会临时修改显示设置并重启两次，验证 NVS 后恢复原设置。
 它会注入菜单按键并测试计时器、Wi-Fi/DAP 启停，结束后 DAP 关闭。
 无线集成测试只查询探针信息，包含分片、错误帧、单客户端和超时检查。
+游戏集成测试遍历八款游戏，验证开始、暂停、恢复、重进、琴键事件及资源余量。
+俄罗斯方块单双击专项使用同一 SDK Python 环境运行 `tools/tetris_smoke.py --port /dev/ttyACM0`，
+逐次检查按下、释放、单击、双击和长按的方块朝向。
 测试结果保存在 build/hardware/；USB status 可查看当前页面、设置和计时状态。
+`status` 还包含 game / game_state / game_score / game_steps / ui_stack_free；
+`key enter long` 可注入长按，`key up release` 可释放测试中按住的方向键。
 
 ## 结构和依赖
 

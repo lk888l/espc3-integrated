@@ -42,19 +42,34 @@ int main(int argc, char** argv)
             model.tick(now);
         }
     };
-    for (unsigned card = 0; card < 4; ++card)
+    for (unsigned card = 0; card < menu(View::home).size(); ++card)
     {
         render(frame, model, t, now);
         save(frame, root / ("home-" + std::to_string(card) + ".pgm"));
         model.handle({Key::down, Gesture::pressed, ++now, 0});
         settle();
     }
-    for (const auto view : {View::tools, View::settings, View::clock, View::network, View::debug})
+    for (const auto view : {View::games, View::tools, View::settings, View::clock, View::network,
+                           View::debug, View::about})
     {
         model.open(view);
         settle();
         render(frame, model, t, now);
         save(frame, root / (std::to_string(unsigned(view)) + ".pgm"));
+    }
+    for (unsigned game = 0; game < 8; ++game)
+    {
+        model.open(View(unsigned(View::dino) + game));
+        settle();
+        render(frame, model, t, now);
+        save(frame, root / ("ready-" + std::to_string(game) + ".pgm"));
+        model.handle({Key::enter, Gesture::pressed, ++now, 0});
+        model.handle({Key::enter, Gesture::released, ++now, 1});
+        if (game == 0 || game == 5 || game == 6 || game == 7)
+            model.handle({Key::enter, Gesture::pressed, ++now, 0});
+        for (unsigned n = 0; n < 40; ++n) model.tick(now += 8);
+        render(frame, model, t, now);
+        save(frame, root / ("game-" + std::to_string(game) + ".pgm"));
     }
     model.open(View::home);
     settle();

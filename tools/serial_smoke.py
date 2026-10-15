@@ -79,8 +79,8 @@ class Device:
         assert "ui" in values and "heap" in values and "dap" in values, text
         return values
 
-    def key(self, key):
-        self.command("key " + key)
+    def key(self, key, gesture=None):
+        self.command("key " + key + (" " + gesture if gesture else ""))
         time.sleep(0.012)
 
     def reset(self):
@@ -102,12 +102,12 @@ class Device:
     def open_home_card(self, index):
         self.home()
         state = self.status()
-        for _ in range((index - state["selected"]) % 4):
+        for _ in range((index - state["selected"]) % 5):
             self.key("down")
         self.key("enter")
 
     def settings(self):
-        self.open_home_card(3)
+        self.open_home_card(4)
         state = self.status()
         assert state["ui"] == 4, state
         for _ in range(state["selected"]):
@@ -152,7 +152,7 @@ def main():
         identity = device.ap_identity()
         passed("USB console and runtime health")
 
-        device.open_home_card(0)
+        device.open_home_card(1)
         assert device.status()["ui"] == 1
         device.key("down")
         device.key("enter")
@@ -179,7 +179,7 @@ def main():
         assert device.status()["stopwatch_ms"] == 0
         passed("Rapid page navigation and both timers")
 
-        for card, view in ((1, 2), (2, 3), (3, 4)):
+        for card, view in ((0, 11), (2, 2), (3, 3), (4, 4)):
             device.open_home_card(card)
             assert device.status()["ui"] == view
         device.home()
@@ -187,7 +187,7 @@ def main():
         for _ in range(40):
             device.key("down")
         assert device.status()["events"] == before + 40
-        passed("All home cards and 40 presses during animation")
+        passed("All five home cards and 40 presses during animation")
 
         changed = {"motion": (original["motion"] + 1) % 3,
                    "brightness": (original["brightness"] + 1) % 4,

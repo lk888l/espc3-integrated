@@ -5,9 +5,13 @@
 #include <span>
 #include <string_view>
 
+#include "c3/games.hpp"
+#include "c3/bonus_games.hpp"
+
 namespace c3
 {
 constexpr std::size_t frame_bytes = 128 * 64 / 8;
+constexpr uint16_t tetris_double_click_ms = 150;
 using Frame = std::array<uint8_t, frame_bytes>;
 enum class Key : uint8_t
 {
@@ -51,7 +55,8 @@ class ButtonBank
 {
    public:
     explicit ButtonBank(ButtonConfig config = {}) : config_(config) {}
-    std::size_t sample(uint8_t pressed, uint32_t now, std::span<KeyEvent> output);
+    std::size_t sample(uint8_t pressed, uint32_t now, std::span<KeyEvent> output,
+                       uint16_t enter_double_click_ms = 0);
     uint8_t stable_mask() const;
 
    private:
@@ -59,6 +64,7 @@ class ButtonBank
     {
         bool raw{}, stable{}, pending{}, long_sent{};
         uint32_t raw_at{}, press_at{}, release_at{}, pending_held{}, repeat_at{};
+        uint16_t pending_double_click_ms{};
     };
     std::array<State, unsigned(Key::count)> states_{};
     ButtonConfig config_;
@@ -139,6 +145,15 @@ enum class View : uint8_t
     system,
     debug,
     about,
+    games,
+    dino,
+    snake,
+    air_raid,
+    tetris,
+    pong,
+    piano,
+    breakout,
+    flappy,
     count
 };
 enum class Icon : uint8_t
@@ -146,7 +161,8 @@ enum class Icon : uint8_t
     tools,
     network,
     clock,
-    settings
+    settings,
+    games
 };
 enum class Action : uint8_t
 {
@@ -210,6 +226,15 @@ class Model
     bool probe_wanted() const { return probe_wanted_; }
     void probe_stopped() { probe_wanted_ = false; }
     void reset_stopwatch();
+    bool gaming() const { return view_ >= View::dino && view_ <= View::flappy; }
+    bool bonus_game() const { return view_ == View::breakout || view_ == View::flappy; }
+    uint8_t game_index() const { return gaming() ? uint8_t(unsigned(view_) - unsigned(View::dino)) : 255; }
+    GameStatus game_status() const { return bonus_game() ? bonus_.status() : game_.status(); }
+    uint32_t game_score() const { return bonus_game() ? bonus_.score() : game_.score(); }
+    uint8_t game_lives() const { return bonus_game() ? bonus_.lives() : game_.lives(); }
+    uint32_t game_steps() const { return game_steps_; }
+    const GameSession& game() const { return game_; }
+    const BonusSession& bonus() const { return bonus_; }
 
    private:
     void move(int direction);
@@ -218,6 +243,8 @@ class Model
     void update_targets(bool snap = false);
     void effect(Effect e) { effects_ |= e; }
     Settings settings_;
+    GameSession game_;
+    BonusSession bonus_;
     MenuMotion motion_;
     View view_ = View::home, previous_view_ = View::home, about_parent_ = View::settings;
     std::array<uint8_t, unsigned(View::count)> selection_{};
@@ -231,6 +258,7 @@ class Model
     bool stopwatch_running_ = false, countdown_running_ = false;
     KeyEvent last_event_{};
     uint32_t event_count_ = 0;
+    uint32_t game_steps_ = 0, game_serial_ = 0;
 };
 
 struct Telemetry

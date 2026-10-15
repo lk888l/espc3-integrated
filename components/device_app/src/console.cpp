@@ -44,6 +44,12 @@ int status_command(int, char**)
             unsigned(ui.settings.motion), ui.settings.brightness, unsigned(ui.settings.header),
             ui.animating, (unsigned long)ui.events, (unsigned long)ui.stopwatch_ms,
             ui.stopwatch_running, (unsigned long)ui.countdown_seconds, ui.countdown_running);
+        std::printf("game=%u game_state=%u game_score=%lu game_lives=%u game_steps=%lu "
+                    "piano_note=%u piano_sequence=%lu ui_stack_free=%lu "
+                    "tetris_rotation=%u tetris_piece=%u\n",
+                    ui.game, ui.game_state, (unsigned long)ui.game_score, ui.game_lives,
+                    (unsigned long)ui.game_steps, ui.piano_note, (unsigned long)ui.piano_sequence,
+                    (unsigned long)ui.ui_stack_free, ui.tetris_rotation, ui.tetris_piece);
     }
     std::printf(
         "dap=%u ready=%u client=%u swd=%u packets=%lu errors=%lu ack=%02x requested=%lu "
@@ -118,14 +124,25 @@ int dap_command(int argc, char** argv)
 }
 int key_command(int argc, char** argv)
 {
-    if (argc != 2 || !runtime || !runtime->keys) return 1;
+    if ((argc != 2 && argc != 3) || !runtime || !runtime->keys) return 1;
+    Gesture gesture = Gesture::pressed;
+    uint32_t held = 0;
+    if (argc == 3)
+    {
+        constexpr const char* gestures[] = {"press", "release", "click", "double", "long", "repeat"};
+        unsigned found = 0;
+        while (found < std::size(gestures) && std::strcmp(argv[2], gestures[found])) ++found;
+        if (found == std::size(gestures)) return 1;
+        gesture = Gesture(found);
+        if (gesture == Gesture::long_press) held = 650;
+        if (gesture == Gesture::repeat) held = 760;
+    }
     constexpr const char* names[] = {"up",   "down", "left",  "right",
                                      "jump", "func", "enter", "back"};
     for (unsigned i = 0; i < 8; ++i)
         if (!std::strcmp(argv[1], names[i]))
         {
-            const KeyEvent event{Key(i), Gesture::pressed, uint32_t(esp_timer_get_time() / 1000),
-                                 0};
+            const KeyEvent event{Key(i), gesture, uint32_t(esp_timer_get_time() / 1000), held};
             return xQueueSend(runtime->keys, &event, 0) == pdTRUE ? 0 : 1;
         }
     return 1;
@@ -245,8 +262,8 @@ class ConsoleModule final : public AppModule
                                                .func_w_context = nullptr,
                                                .context = nullptr},
                                               {.command = "key",
-                                               .help = "Inject one menu press",
-                                               .hint = "up|down|left|right|enter|back|func|jump",
+                                               .help = "Inject one input event (default: press)",
+                                               .hint = "KEY [press|release|click|double|long|repeat]",
                                                .func = key_command,
                                                .argtable = nullptr,
                                                .func_w_context = nullptr,

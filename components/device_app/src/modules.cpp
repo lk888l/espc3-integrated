@@ -7,6 +7,7 @@
 #include "c3/network.hpp"
 #include "c3/oled.hpp"
 #include "c3/probe.hpp"
+#include "c3/piano_audio.hpp"
 #include "driver/gpio.h"
 #include "esp_log.h"
 #include "esp_system.h"
@@ -167,7 +168,9 @@ class InputTask final : public AppTask
             for (unsigned i = 0; i < board::keys.size(); ++i)
                 if (board::keys[i] >= 0 && !(levels & (1U << unsigned(board::keys[i]))))
                     pressed |= uint8_t(1U << i);
-            const auto count = bank.sample(pressed, now_ms(), events);
+            const uint16_t enter_window = runtime_.ui_snapshot().view == View::tetris
+                                              ? tetris_double_click_ms : 0;
+            const auto count = bank.sample(pressed, now_ms(), events, enter_window);
             runtime_.stable_keys = bank.stable_mask();
             runtime_.key_events.fetch_add(count);
             const auto routed_count =
@@ -231,11 +234,13 @@ class InputModule final : public AppModule
 class UiTask final : public AppTask
 {
    public:
-    UiTask(Runtime& r, Oled& oled) : AppTask("oled_ui", 6144, 4, 0), runtime_(r), oled_(oled) {}
+    UiTask(Runtime& r, Oled& oled, PianoAudio& audio)
+        : AppTask("oled_ui", 8192, 4, 0), runtime_(r), oled_(oled), audio_(audio) {}
 
    private:
     Runtime& runtime_;
     Oled& oled_;
+    PianoAudio& audio_;
     Frame frame_{};
     void effects(Model& model)
     {
@@ -283,6 +288,8 @@ class UiTask final : public AppTask
                 model.handle(event);
             }
             model.tick(now);
+            audio_.update(model.view() == View::piano && model.game_status() == GameStatus::playing,
+                          model.game().note(), model.game().note_sequence(), now);
             effects(model);
             if (!network::enabled_requested())
             {
@@ -340,7 +347,11 @@ class UiTask final : public AppTask
             runtime_.publish_ui({model.view(), model.selected(model.view()), model.settings(),
                                  model.motion().active(), model.event_count(), model.stopwatch_ms(),
                                  model.countdown_seconds(), model.stopwatch_running(),
-                                 model.countdown_running()});
+                                 model.countdown_running(), model.game_index(),
+                                 uint8_t(model.game_status()), model.game_lives(), model.game().note(),
+                                 model.game_score(), model.game_steps(), model.game().note_sequence(),
+                                 uint32_t(uxTaskGetStackHighWaterMark(nullptr)),
+                                 model.game().tetris_rotation(), model.game().tetris_piece()});
             runtime_.frames = oled_.frames;
             runtime_.skipped = oled_.skipped;
             runtime_.display_errors = oled_.errors;
@@ -348,23 +359,31 @@ class UiTask final : public AppTask
             pace(next, pdMS_TO_TICKS(CONFIG_C3_UI_PERIOD_MS));
         }
         dap::enable(false);
+        audio_.stop();
     }
 };
 class UiModule final : public AppModule
 {
    public:
-    explicit UiModule(Runtime& r) : runtime_(r), task_(r, oled_) {}
+    explicit UiModule(Runtime& r) : runtime_(r), task_(r, oled_, audio_) {}
     std::string_view name() const override { return "ui"; }
 
    private:
     Runtime& runtime_;
     Oled oled_;
+    PianoAudio audio_;
     UiTask task_;
     bool on_initialize() override
     {
-        return oled_.initialize(runtime_.initial_settings.contrast()) == ESP_OK && task_.start();
+        return oled_.initialize(runtime_.initial_settings.contrast()) == ESP_OK &&
+               audio_.initialize() && task_.start();
     }
-    bool on_deinitialize() override { return task_.stop() && oled_.deinitialize(); }
+    bool on_deinitialize() override
+    {
+        if (!task_.stop()) return false;
+        audio_.deinitialize();
+        return oled_.deinitialize();
+    }
 };
 }  // namespace
 std::unique_ptr<AppModule> create_storage(Runtime& r) { return std::make_unique<StorageModule>(r); }

@@ -68,6 +68,14 @@ menu "C3 GameBox"
             int "Target NRST GPIO (-1 = not connected)"
             range -1 21
             default -1
+        config C3_BUZZER_GPIO
+            int "Passive buzzer PWM GPIO (-1 = silent Piano)"
+            range -1 21
+            default -1
+            help
+                Optional passive buzzer for Piano. Choose a free output GPIO;
+                the board pin policy checks conflicts with display, keys and SWD.
+                GPIO2/8/9 require Allow external use of strapping pins.
         config C3_ALLOW_STRAPPING_PINS
             bool "Allow external use of GPIO2/8/9 (check boot levels)"
             default n

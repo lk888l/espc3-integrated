@@ -111,6 +111,7 @@ void model_tests()
     model.tick(0);
     model.tick(600);
     assert(!model.booting());
+    model.handle({Key::down, Gesture::pressed, 600, 0});  // Tools follows the new Games card.
     model.handle({Key::enter, Gesture::pressed, 601, 0});
     assert(model.view() == View::tools && !model.motion().page_x.settled());
     model.handle({Key::down, Gesture::pressed, 606, 0});

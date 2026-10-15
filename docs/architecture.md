@@ -25,7 +25,7 @@ NVS 初始化失败会报告错误，不自动擦除已有配置。
 | 任务 | 优先级 | 栈字节 | 职责 |
 | --- | ---: | ---: | --- |
 | buttons | 6 | 3072 | 默认 5 ms，读取 GPIO 并识别事件 |
-| oled_ui | 4 | 6144 | 默认 5 ms，唯一 UI/屏幕所有者 |
+| oled_ui | 4 | 8192 | 默认 5 ms，唯一 UI/屏幕/游戏/Piano PWM 所有者 |
 | network | 3 | 4096 | 25 ms，重连、凭据、SNTP |
 | wifi_dap | 2 | 6144 | 2 ms 轮询，唯一 DAP/SWD 所有者 |
 | console | 2 | 4096 | 有限时 USB 读取，命令提交请求 |
@@ -50,7 +50,7 @@ Wi-Fi、Flash 和 SPI 都会影响表现。
 
 保留 carousel_x、page_x、cursor_y、cursor_width、scroll_y 五个动画值。
 动画接受新的 Pressed，Released/Click 不重复确认。
-主页保留四卡片，内容适配为 Tools / Network / Clock / Settings。
+主页五卡片为 Games / Tools / Network / Clock / Settings。
 字体、布局和宠物两帧来自相同参考工程。
 
 ## 屏幕
@@ -80,5 +80,17 @@ UI 将页面、选择、设置和计时器状态发布为短临界区快照，
 避免查询状态时意外复位并中断无线会话。
 
 core 不依赖 FreeRTOS 或 ESP-IDF，可用于主机测试。
+GameSession 保存六款参考游戏，BonusSession 保存新增 Breakout / Flappy，均使用固定数组。
+仅当前游戏推进模拟；暂停冻结游戏状态，恢复重新安排时钟，退出后重新进入为新局。
+原六款按各自周期推进，每次最多追赶六步；新增两款使用 16 ms 固定步长、
+最多追赶 128 ms，避免阻塞后无限追帧。游戏输入在全局快捷键之前路由，
+因此长按 Enter 暂停不会触发普通页面返回；Up+Down 仍经过 BackChord 返回。
+Tetris 的 Enter 只在最终 Click 时旋转、DoubleClick 时硬降，Pressed 不改变方块。
+InputTask 根据 UI 快照为 Tetris 的 Enter 使用 150 ms 判定窗口，其余页面和按键
+保留 280 ms；窗口在首次释放时锁存，已有手势不会因切页改变判定时限。
+最多两个释放资格按 FIFO 归属，隔离菜单、开始、继续的延迟手势；
+长按暂停清除待确认动作并吞掉对应释放，避免双击或长按夹带旋转。
+Piano 的可选 LEDC 适配位于 device_app，core 只发布音符与单调递增弹奏序号。
+UI 快照增加游戏状态及栈历史最低余量，控制台注入按下/释放/长按等事件仍走按键队列。
 GPIO LL 访问限制在输入与 SWD 适配器，升级 SDK 后需复核。
 不需要 LVGL、Arduino、下载字体或组件管理器。

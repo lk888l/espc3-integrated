@@ -77,16 +77,25 @@ def main():
     subprocess.run([str(root / args.renderer), str(raw)], check=True, cwd=root)
     output = root / args.output
     output.mkdir(parents=True, exist_ok=True)
-    files = [f"home-{i}.pgm" for i in range(4)] + ["1.pgm", "4.pgm", "3.pgm", "2.pgm", "9.pgm"]
+    files = [f"home-{i}.pgm" for i in range(5)] + ["11.pgm", "1.pgm", "4.pgm", "3.pgm", "2.pgm", "9.pgm", "10.pgm"]
     tiles = [enlarge(load_pgm(raw / file), 3) for file in files]
     rows = []
     gap = bytes([48]) * (384 * 3 + 8 * 2)
-    for row in range(3):
+    for row in range(4):
         if row:
             rows.extend([gap] * 8)
         for y in range(192):
             rows.append(bytes([48] * 8).join(tiles[row * 3 + col][y] for col in range(3)))
     png(output / "menu.png", rows)
+    for prefix in ("game", "ready"):
+        tiles = [enlarge(load_pgm(raw / f"{prefix}-{i}.pgm"), 3) for i in range(8)]
+        rows = []
+        for row in range(2):
+            if row:
+                rows.extend([bytes([48]) * (384 * 4 + 8 * 3)] * 8)
+            for y in range(192):
+                rows.append(bytes([48] * 8).join(tiles[row * 4 + col][y] for col in range(4)))
+        png(output / f"games-{prefix}.png", rows)
     gif(output / "menu.gif", [load_pgm(file) for file in sorted(raw.glob("animation-*.pgm"))])
     print(f"Preview: {output / 'menu.png'}")
     print(f"Animation: {output / 'menu.gif'}")

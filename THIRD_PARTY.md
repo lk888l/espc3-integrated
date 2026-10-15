@@ -3,7 +3,8 @@
 | 内容 | 位置 | 来源 |
 | --- | --- | --- |
 | 生命周期框架 | components/app | 用户 esp_idf_template，保留初始化/回滚/失败保留语义 |
-| 菜单、弹簧、ASCII 字体、宠物 | components/core | STM-GameBox Rust 到 C++ 移植，MIT，保留 third_party/STM-GameBox.LICENSE |
+| 菜单、弹簧、ASCII 字体、宠物、六款游戏玩法 | components/core | STM-GameBox C++ 工程，MIT，保留 third_party/STM-GameBox.LICENSE；游戏改用三键输入及本工程 Canvas |
+| Breakout、Flappy | components/core/src/bonus_games.cpp | 本工程新增，无额外第三方依赖 |
 | CMSIS-DAP 引擎 | components/debug_probe/vendor | Arm CMSIS-DAP，Apache-2.0，完整 LICENSE |
 | SWD/TCP 适配 | components/debug_probe | 参考 m5_sticks3 引擎与校验，重写 C3 引脚、延时与无线生命周期 |
 | Super Mini 引脚图 | docs/hardware/pinout.png | 用户 NAS 图片，保留本地副本 |
@@ -21,7 +22,10 @@ smb://nas.local/home/archive/docs/ESP32C3SuperMini-资料/ESP32C3SuperMini引脚
 
 Arm 上游固定提交 12636590eec66fae2d1bba4518749426ad5a4595。
 适配修改见 components/debug_probe/vendor/README.md。
-菜单相关代码的完整 MIT 声明保存在 third_party/STM-GameBox.LICENSE。
+菜单及游戏相关代码的完整 MIT 声明保存在 third_party/STM-GameBox.LICENSE。
+游戏参考 `App/Src/games/`，Piano 参考 `App/Src/ui/ui_service.cpp` 和音频服务；
+移除 STM32 HAL、原输入服务和屏幕依赖，使用 ESP32-C3 的现有调度与 OLED 缓冲区。
+本次游戏移植参考本地 STM-GameBox 提交 `d269383a6f58db30d5886ac65927e3546c41ac3c`。
 
 ESP-IDF 5.5.4、FreeRTOS、lwIP、Wi-Fi、NVS、esptool 和 OpenOCD 由本地 SDK 提供。
 没有 idf_component.yml、远程 EXTRA_COMPONENT_DIRS、FetchContent 或源码下载。

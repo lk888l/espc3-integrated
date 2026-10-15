@@ -115,6 +115,13 @@ void icon(Canvas& c, Icon icon, int x, int y)
 {
     switch (icon)
     {
+        case Icon::games:
+            c.rounded(x, y + 3, 23, 16);
+            c.line(x + 4, y + 11, x + 10, y + 11);
+            c.line(x + 7, y + 8, x + 7, y + 14);
+            c.rect(x + 16, y + 8, 2, 2, set, true);
+            c.rect(x + 19, y + 12, 2, 2, set, true);
+            break;
         case Icon::clock:
             c.rounded(x, y, 22, 22);
             c.line(x + 11, y + 3, x + 11, y + 11);
@@ -179,7 +186,8 @@ void home_card(Canvas& c, const Model& m, const Telemetry& t, unsigned index, in
         }
     }
     char position[6];
-    std::snprintf(position, sizeof(position), "%u/4", index + 1);
+    const unsigned cards = unsigned(menu(View::home).size());
+    std::snprintf(position, sizeof(position), "%u/%u", index + 1, cards);
     c.rounded(x + 92, 2, 32, 9, set, true);
     c.text(x + 98, 3, position, true);
     c.line(x + 4, 12, x + 123, 12);
@@ -190,14 +198,14 @@ void home_card(Canvas& c, const Model& m, const Telemetry& t, unsigned index, in
     c.line(x + 46, 30, x + 122, 30);
     c.text(x + 46, 33, entry.subtitle);
     c.line(x + 4, 47, x + 123, 47);
-    for (unsigned dot = 0; dot < 4; ++dot)
+    for (unsigned dot = 0; dot < cards; ++dot)
     {
         if (dot == index)
             c.rect(x + 8 + int(dot) * 7, 54, 5, 3, set, true);
         else
             c.pixel(x + 10 + int(dot) * 7, 55);
     }
-    c.text(x + 42, 52, "<> MOVE");
+    c.text(x + 46, 52, "<> MOVE");
     c.text(x + 92, 52, "ENTER");
 }
 std::string_view setting_value(const Model& m, Action action, const Telemetry& t)
@@ -268,6 +276,13 @@ void view(Canvas& c, const Model& m, const Telemetry& t, View v, int x, uint32_t
     if (!menu(v).empty())
     {
         list(c, m, t, v, x, interactive);
+        return;
+    }
+    if (v >= View::dino && v <= View::flappy)
+    {
+        // The session remains available while the page slides out to the game list.
+        if (v == View::breakout || v == View::flappy) m.bonus().draw(c, x);
+        else m.game().draw(c, x);
         return;
     }
     header(c, x, title(v));
@@ -380,7 +395,7 @@ void view(Canvas& c, const Model& m, const Telemetry& t, View v, int x, uint32_t
             footer(c, x, "UP/DN RATE OK PAUSE");
             break;
         case View::about:
-            c.text(x + 10, 17, "C3 GAMEBOX 1.0");
+            c.text(x + 10, 17, "C3 GAMEBOX 1.1.2");
             c.text(x + 10, 29, "SSD1306 / 128X64");
             c.text(x + 10, 41, "ESP-IDF / C++20");
             footer(c, x, "GAMEBOX MOTION PORT");

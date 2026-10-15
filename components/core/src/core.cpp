@@ -6,9 +6,13 @@
 
 namespace c3
 {
-std::size_t ButtonBank::sample(uint8_t pressed, uint32_t now, std::span<KeyEvent> output)
+std::size_t ButtonBank::sample(uint8_t pressed, uint32_t now, std::span<KeyEvent> output,
+                              uint16_t enter_double_click_ms)
 {
     if (!config_.valid()) return 0;
+    const uint16_t enter_window = enter_double_click_ms > 2 * config_.debounce_ms &&
+                                  enter_double_click_ms < config_.long_press_ms
+                                      ? enter_double_click_ms : config_.double_click_ms;
     std::size_t count = 0;
     const auto emit = [&](Key key, Gesture gesture, uint32_t held = 0)
     {
@@ -39,7 +43,7 @@ std::size_t ButtonBank::sample(uint8_t pressed, uint32_t now, std::span<KeyEvent
                 emit(key, Gesture::released, held);
                 if (s.long_sent)
                     s.pending = false;
-                else if (s.pending && now - s.release_at < config_.double_click_ms)
+                else if (s.pending && now - s.release_at < s.pending_double_click_ms)
                 {
                     s.pending = false;
                     emit(key, Gesture::double_click, held);
@@ -50,6 +54,10 @@ std::size_t ButtonBank::sample(uint8_t pressed, uint32_t now, std::span<KeyEvent
                     s.pending = true;
                     s.release_at = now;
                     s.pending_held = held;
+                    // Finish a pending gesture with the window from its first
+                    // release, even if the UI changes pages before it completes.
+                    s.pending_double_click_ms = key == Key::enter ? enter_window
+                                                                  : config_.double_click_ms;
                 }
             }
         }
@@ -69,7 +77,7 @@ std::size_t ButtonBank::sample(uint8_t pressed, uint32_t now, std::span<KeyEvent
                 emit(key, Gesture::repeat, now - s.press_at);
             }
         }
-        if (s.pending && now - s.release_at >= config_.double_click_ms)
+        if (s.pending && now - s.release_at >= s.pending_double_click_ms)
         {
             s.pending = false;
             emit(key, Gesture::click, s.pending_held);
@@ -142,10 +150,20 @@ bool MenuMotion::active() const
 std::span<const Entry> menu(View view)
 {
     static constexpr Entry home[] = {
+        {"Games", "8 MINI GAMES", View::games, Action::open, Icon::games},
         {"Tools", "INPUT/TIMERS", View::tools, Action::open, Icon::tools},
         {"Network", "WI-FI & NTP", View::network, Action::open, Icon::network},
         {"Clock", "NETWORK TIME", View::clock, Action::open, Icon::clock},
         {"Settings", "PERSONALIZE", View::settings, Action::open, Icon::settings}};
+    static constexpr Entry games[] = {
+        {"Dino", "", View::dino, Action::open, Icon::games},
+        {"Snake", "", View::snake, Action::open, Icon::games},
+        {"Air Raid", "", View::air_raid, Action::open, Icon::games},
+        {"Tetris", "", View::tetris, Action::open, Icon::games},
+        {"Pong", "", View::pong, Action::open, Icon::games},
+        {"Piano", "", View::piano, Action::open, Icon::games},
+        {"Breakout", "", View::breakout, Action::open, Icon::games},
+        {"Flappy", "", View::flappy, Action::open, Icon::games}};
     static constexpr Entry tools[] = {{"Stopwatch", "", View::stopwatch, Action::open, Icon::clock},
                                       {"Countdown", "", View::countdown, Action::open, Icon::clock},
                                       {"Input Lab", "", View::input_lab, Action::open, Icon::tools},
@@ -164,6 +182,8 @@ std::span<const Entry> menu(View view)
             return home;
         case View::tools:
             return tools;
+        case View::games:
+            return games;
         case View::settings:
             return settings;
         default:
@@ -174,7 +194,9 @@ std::string_view title(View v)
 {
     static constexpr std::string_view names[] = {
         "C3 GAMEBOX", "TOOLS",     "NETWORK", "CLOCK",     "SETTINGS", "STOPWATCH",
-        "COUNTDOWN",  "INPUT LAB", "SYSTEM",  "WI-FI DAP", "ABOUT"};
+        "COUNTDOWN",  "INPUT LAB", "SYSTEM",  "WI-FI DAP", "ABOUT", "GAMES",
+        "DINO", "SNAKE", "AIR RAID", "TETRIS", "PONG", "PIANO", "BREAKOUT", "FLAPPY"};
+    static_assert(std::size(names) == unsigned(View::count));
     return unsigned(v) < unsigned(View::count) ? names[unsigned(v)] : "";
 }
 Model::Model(Settings settings) : settings_(settings.valid() ? settings : Settings{}) {}
@@ -200,6 +222,12 @@ void Model::tick(uint32_t now)
         countdown_base_ = 0;
         countdown_running_ = false;
     }
+    if (gaming())
+    {
+        if (game_status() == GameStatus::playing) ++game_steps_;
+        if (bonus_game()) bonus_.tick(now);
+        else game_.tick(now);
+    }
 }
 void Model::handle(KeyEvent event)
 {
@@ -209,6 +237,13 @@ void Model::handle(KeyEvent event)
     if (booting_)
     {
         if (event.gesture == Gesture::pressed) booting_ = false;
+        return;
+    }
+    if (gaming())
+    {
+        if (event.key == Key::back && event.gesture == Gesture::pressed) back();
+        else if (bonus_game()) bonus_.handle(event);
+        else game_.handle(event);
         return;
     }
     if (event.gesture == Gesture::long_press && (event.key == Key::enter || event.key == Key::back))
@@ -347,7 +382,7 @@ void Model::confirm()
 }
 void Model::open(View next, bool forward)
 {
-    if (next == view_ || next == View::count) return;
+    if (next == view_ || unsigned(next) >= unsigned(View::count)) return;
     if (view_ == View::debug)
     {
         probe_wanted_ = false;
@@ -356,6 +391,14 @@ void Model::open(View next, bool forward)
     if (next == View::about) about_parent_ = view_;
     previous_view_ = view_;
     view_ = next;
+    if (gaming())
+    {
+        // A fresh session on every entry; the menu-confirm press is never forwarded.
+        game_steps_ = 0;
+        const uint32_t seed = now_ ^ (++game_serial_ * 2654435761U);
+        if (bonus_game()) bonus_.reset(next == View::flappy, seed);
+        else game_.reset(GameId(unsigned(next) - unsigned(View::dino)), seed);
+    }
     forward_ = forward;
     motion_.carousel_x.snap(0);
     motion_.page_x.snap(int16_t(forward ? 128 : -128));
@@ -371,8 +414,9 @@ void Model::back()
 {
     if (view_ == View::home) return;
     const auto destination = view_ == View::about ? about_parent_
+                             : gaming() ? View::games
                              : (view_ == View::tools || view_ == View::network ||
-                                view_ == View::clock || view_ == View::settings)
+                                view_ == View::clock || view_ == View::settings || view_ == View::games)
                                  ? View::home
                                  : View::tools;
     open(destination, false);

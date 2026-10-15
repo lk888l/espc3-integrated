@@ -16,6 +16,9 @@ struct UiSnapshot
     bool animating = false;
     uint32_t events = 0, stopwatch_ms = 0, countdown_seconds = 300;
     bool stopwatch_running = false, countdown_running = false;
+    uint8_t game = 255, game_state = 0, game_lives = 0, piano_note = 0;
+    uint32_t game_score = 0, game_steps = 0, piano_sequence = 0, ui_stack_free = 0;
+    uint8_t tetris_rotation = 0, tetris_piece = 0;
 };
 struct Runtime
 {
