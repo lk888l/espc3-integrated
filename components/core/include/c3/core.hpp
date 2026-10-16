@@ -7,6 +7,7 @@
 
 #include "c3/games.hpp"
 #include "c3/bonus_games.hpp"
+#include "c3/pet.hpp"
 
 namespace c3
 {
@@ -154,6 +155,7 @@ enum class View : uint8_t
     piano,
     breakout,
     flappy,
+    pet,
     count
 };
 enum class Icon : uint8_t
@@ -162,7 +164,8 @@ enum class Icon : uint8_t
     network,
     clock,
     settings,
-    games
+    games,
+    pet
 };
 enum class Action : uint8_t
 {
@@ -235,6 +238,8 @@ class Model
     uint32_t game_steps() const { return game_steps_; }
     const GameSession& game() const { return game_; }
     const BonusSession& bonus() const { return bonus_; }
+    PetSession& pet() { return pet_; }
+    const PetSession& pet() const { return pet_; }
 
    private:
     void move(int direction);
@@ -245,6 +250,7 @@ class Model
     Settings settings_;
     GameSession game_;
     BonusSession bonus_;
+    PetSession pet_;
     MenuMotion motion_;
     View view_ = View::home, previous_view_ = View::home, about_parent_ = View::settings;
     std::array<uint8_t, unsigned(View::count)> selection_{};

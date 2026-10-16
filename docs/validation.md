@@ -1,5 +1,38 @@
 # 验证记录
 
+## 2026-10-16：全屏桌宠及 wl1-studio 编辑器
+
+四种内置宠物、八种动作、物理按键互动与 PET1 自定义动画上传完成。
+桌宠为第六张主页卡片，原有页面和游戏编号不变。
+
+| 检查 | 结果 |
+| --- | --- |
+| ESP-IDF 5.5.4 / Docker esp-dev 编译和烧录 | 通过；ESP32-C3，/dev/ttyACM0，写入哈希校验通过 |
+| ASan/UBSan 主机 CTest | 全部8项通过，独立目录 /tmp/c3-pet-host 避免已有容器路径缓存冲突 |
+| pet_tests | 包校验和旧包保留、最大24帧、逐像素2倍放大、动作回退、手势隔离、休眠唤醒、计时回绕、全屏生命周期通过 |
+| pet_smoke.py 实机 | 全部7组通过；4样式×8动作、按键、错误包、最大6208B连续替换、NVS重启恢复、运行健康 |
+| 原功能实机回归 | serial_smoke 6组、game_smoke 11组、tetris_smoke 6组全部通过 |
+| wl1-studio 前端 | 类型检查、lint、202项测试和生产构建通过 |
+| wl1-studio Rust | 全量157项测试通过、13项硬件/环境测试默认忽略；全targets/features Clippy无警告 |
+| Rust真实串口通道 | hardware_console实际执行通过，覆盖握手、动作、分块ACK、CRC、保存和重连 |
+| 跨端数据 | 直接运行真实TypeScript编码器生成4160B猫咪包，经Rust通道上传到设备成功 |
+| 界面检查 | Chrome真实页面无运行异常，产品导航、八动作、拖绘、本地保存、帧增删及预设通过 |
+| 视觉 | 真实固件渲染器导出四种宠物和八动作，已查看；工作台实际截图已保存 |
+
+最终实机回归 OLED SPI errors=0、按键 drops=0。
+UI任务8192B栈的历史最低余量4428B；回归结束空闲堆140692B，历史最低132136B。
+桌宠模式测试结束空闲堆141176B，动画包在堆上，Model不含大块位图存储。
+
+应用bin为959088字节，SHA-256：
+
+```text
+83d0c9c5ae875a15dc9692d1fd2f490e37d3ccfbddc208014fcf0b4c4ed3f88f
+```
+
+实机日志和结果在 `build/hardware/{pet,serial,game,tetris}-smoke.{log,json}`。
+最终安装并打开了上位机猫咪自定义包。草稿和自定义包操作见
+[桌宠模式](pet-mode.md)，图片见 `docs/previews/pets.png`、`pets.gif` 和 `pet-studio.png`。
+
 ## 2026-10-15：俄罗斯方块单击延迟缩短，固件 1.1.2
 
 Tetris 的 Enter 单击/双击判定窗口从 280 ms 缩短到 150 ms，

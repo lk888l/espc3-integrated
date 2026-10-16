@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <new>
 
 #include "app_task.hpp"
 #include "c3/board.hpp"
@@ -42,6 +43,27 @@ class StorageTask final : public AppTask
     bool pending_ = false;
     Settings latest_{};
     uint32_t changed_ = 0;
+    uint8_t saved_pet_style_ = 0;
+    bool pet_pending_ = false;
+    uint32_t pet_changed_ = 0;
+    void save_pet_style()
+    {
+        if (!pet_pending_) return;
+        nvs_handle_t handle;
+        auto result = nvs_open("pet", NVS_READWRITE, &handle);
+        if (result == ESP_OK)
+        {
+            result = nvs_set_u8(handle, "style", saved_pet_style_);
+            if (result == ESP_OK) result = nvs_commit(handle);
+            nvs_close(handle);
+        }
+        if (result == ESP_OK) pet_pending_ = false;
+        else
+        {
+            ESP_LOGW(tag, "pet style save failed: %s", esp_err_to_name(result));
+            pet_changed_ = now_ms();
+        }
+    }
     void flush()
     {
         if (!pending_) return;
@@ -65,6 +87,7 @@ class StorageTask final : public AppTask
     }
     void main() override
     {
+        saved_pet_style_ = runtime_.pet_style.load();
         while (!should_exit())
         {
             Settings next;
@@ -76,6 +99,14 @@ class StorageTask final : public AppTask
                 changed_ = now_ms();
             }
             if (pending_ && now_ms() - changed_ >= 750) flush();
+            const auto style = runtime_.pet_style.load();
+            if (style != saved_pet_style_)
+            {
+                saved_pet_style_ = style;
+                pet_pending_ = true;
+                pet_changed_ = now_ms();
+            }
+            if (pet_pending_ && now_ms() - pet_changed_ >= 750) save_pet_style();
         }
         Settings next;
         if (xQueueReceive(runtime_.settings, &next, 0) == pdTRUE && next.valid())
@@ -84,6 +115,7 @@ class StorageTask final : public AppTask
             pending_ = true;
         }
         flush();
+        save_pet_style();
     }
 };
 class StorageModule final : public AppModule
@@ -116,6 +148,26 @@ class StorageModule final : public AppModule
             if (read == ESP_OK && size == sizeof(record) && loaded.valid())
                 runtime_.initial_settings = loaded;
         }
+        if (nvs_open("pet", NVS_READONLY, &handle) == ESP_OK)
+        {
+            uint8_t style = 0;
+            if (nvs_get_u8(handle, "style", &style) == ESP_OK && style <= 4)
+                runtime_.pet_style = style;
+            std::size_t size = 0;
+            if (nvs_get_blob(handle, "pack", nullptr, &size) == ESP_OK &&
+                size >= 64 && size <= PetPack::max_bytes)
+            {
+                auto bytes = std::unique_ptr<uint8_t[]>(new (std::nothrow) uint8_t[size]);
+                auto pack = std::unique_ptr<PetPack>(new (std::nothrow) PetPack);
+                if (bytes && pack && nvs_get_blob(handle, "pack", bytes.get(), &size) == ESP_OK &&
+                    pack->decode(std::span<const uint8_t>(bytes.get(), size)))
+                    runtime_.pet_pack = std::move(pack);
+                else
+                    ESP_LOGW(tag, "invalid or unreadable custom pet; using built-in style");
+            }
+            nvs_close(handle);
+        }
+        if (runtime_.pet_style == 4 && !runtime_.pet_pack) runtime_.pet_style = 0;
         return task_.start();
     }
     bool on_deinitialize() override
@@ -274,6 +326,8 @@ class UiTask final : public AppTask
     void main() override
     {
         Model model(runtime_.initial_settings);
+        model.pet().set_custom(runtime_.pet_pack.get());
+        model.pet().select(runtime_.pet_style.load(), now_ms());
         TickType_t next = xTaskGetTickCount();
         uint32_t network_at = now_ms() - 250, recover_at = 0, backoff = 100;
         bool broken = false;
@@ -281,6 +335,39 @@ class UiTask final : public AppTask
         while (!should_exit())
         {
             const uint32_t now = now_ms();
+            std::array<PetResult, 4> pet_results{};
+            unsigned pet_count = 0;
+            for (; pet_count < pet_results.size(); ++pet_count)
+            {
+                PetRequest request;
+                if (xQueueReceive(runtime_.pet_requests, &request, 0) != pdTRUE) break;
+                bool ok = true;
+                switch (request.operation)
+                {
+                    case PetOperation::open:
+                        ok = model.pet().select(request.value, now);
+                        if (ok) model.open(View::pet);
+                        break;
+                    case PetOperation::action:
+                        ok = model.view() == View::pet && request.value < unsigned(PetAction::count);
+                        if (ok) model.pet().act(PetAction(request.value), now);
+                        break;
+                    case PetOperation::close:
+                        if (model.view() == View::pet) model.open(View::home, false);
+                        break;
+                    case PetOperation::install:
+                        ok = request.pack != nullptr;
+                        if (ok)
+                        {
+                            runtime_.pet_pack.reset(request.pack);
+                            model.pet().set_custom(runtime_.pet_pack.get());
+                            model.pet().select(4, now);
+                            model.open(View::pet);
+                        }
+                        break;
+                }
+                pet_results[pet_count] = {request.id, ok};
+            }
             for (unsigned i = 0; i < 64; ++i)
             {
                 KeyEvent event;
@@ -351,7 +438,13 @@ class UiTask final : public AppTask
                                  uint8_t(model.game_status()), model.game_lives(), model.game().note(),
                                  model.game_score(), model.game_steps(), model.game().note_sequence(),
                                  uint32_t(uxTaskGetStackHighWaterMark(nullptr)),
-                                 model.game().tetris_rotation(), model.game().tetris_piece()});
+                                 model.game().tetris_rotation(), model.game().tetris_piece(),
+                                 model.pet().style(), uint8_t(model.pet().action()),
+                                 model.pet().sequence(),
+                                 uint32_t(runtime_.pet_pack ? runtime_.pet_pack->size() : 0)});
+            runtime_.pet_style = model.pet().style();
+            for (unsigned i = 0; i < pet_count; ++i)
+                xQueueSend(runtime_.pet_results, &pet_results[i], 0);
             runtime_.frames = oled_.frames;
             runtime_.skipped = oled_.skipped;
             runtime_.display_errors = oled_.errors;
@@ -375,12 +468,28 @@ class UiModule final : public AppModule
     UiTask task_;
     bool on_initialize() override
     {
+        runtime_.pet_requests = xQueueCreate(4, sizeof(PetRequest));
+        runtime_.pet_results = xQueueCreate(4, sizeof(PetResult));
+        if (!runtime_.pet_requests || !runtime_.pet_results) return false;
         return oled_.initialize(runtime_.initial_settings.contrast()) == ESP_OK &&
                audio_.initialize() && task_.start();
     }
     bool on_deinitialize() override
     {
         if (!task_.stop()) return false;
+        if (runtime_.pet_requests)
+        {
+            PetRequest request;
+            while (xQueueReceive(runtime_.pet_requests, &request, 0) == pdTRUE)
+                delete request.pack;
+            vQueueDelete(runtime_.pet_requests);
+            runtime_.pet_requests = nullptr;
+        }
+        if (runtime_.pet_results)
+        {
+            vQueueDelete(runtime_.pet_results);
+            runtime_.pet_results = nullptr;
+        }
         audio_.deinitialize();
         return oled_.deinitialize();
     }

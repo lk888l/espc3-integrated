@@ -14,9 +14,14 @@
 #include "esp_timer.h"
 namespace c3::device
 {
+int pet_command(Runtime& runtime, int argc, char** argv);
 namespace
 {
 Runtime* runtime = nullptr;
+int pet_console_command(int argc, char** argv)
+{
+    return runtime ? pet_command(*runtime, argc, argv) : 1;
+}
 int status_command(int, char**)
 {
     const auto net = network::snapshot();
@@ -187,6 +192,12 @@ class ConsoleTask final : public AppTask
                 overflow = false;
                 write("c3> ", 4);
             }
+            else if (ch == 21)  // Ctrl-U: discard a partial command when a host reconnects
+            {
+                used = 0;
+                overflow = false;
+                write("\r\nc3> ", 6);
+            }
             else if (ch == 8 || ch == 127)
             {
                 if (used)
@@ -233,7 +244,14 @@ class ConsoleModule final : public AppModule
         engine_ = true;
         runtime = &runtime_;
         if (esp_console_register_help_command() != ESP_OK) return false;
-        const esp_console_cmd_t commands[] = {{.command = "status",
+        const esp_console_cmd_t commands[] = {{.command = "pet",
+                                               .help = "Full-screen desktop pet and custom animation upload",
+                                               .hint = "status|open STYLE|action NAME|close|begin SIZE CRC|chunk OFFSET HEX|commit|abort",
+                                               .func = pet_console_command,
+                                               .argtable = nullptr,
+                                               .func_w_context = nullptr,
+                                               .context = nullptr},
+                                              {.command = "status",
                                                .help = "Show runtime health and DAP state",
                                                .hint = nullptr,
                                                .func = status_command,

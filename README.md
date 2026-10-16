@@ -5,7 +5,8 @@ ESP32-C3 Super Mini / ESP-IDF 5.5.4 / C++20。SSD1306 **128×64 四线 SPI**，
 
 已实现：
 
-- 五卡片主页 Games / Tools / Network / Clock / Settings，横向轮播、双页滑入、弹性光标和滚动；
+- 六卡片主页 Games / Tools / Network / Clock / Settings / Desktop Pet，横向轮播、双页滑入、弹性光标和滚动；
+- 全屏桌宠：灵动双眼、像素猫、月兔、糯米史莱姆；八种动作，支持 wl1-studio 自定义像素动画并下载保存；
 - STM-GameBox 的 Dino、Snake、Air Raid、Tetris、Pong、Piano，适配三键操作；
 - 新增 Breakout 打砖块、Flappy 飞鸟，八款统一开始、暂停、重开与返回；
 - 独立高优先级按键任务：5 ms 采样、20 ms 去抖，Pressed 立即操作，
@@ -19,6 +20,22 @@ ESP32-C3 Super Mini / ESP-IDF 5.5.4 / C++20。SSD1306 **128×64 四线 SPI**，
 按用户确认选择 **Wi-Fi CMSIS-DAP/SWD 调试外部 MCU**。
 本 ESP32-C3 的日志和配置通过原生 USB Serial/JTAG 控制台访问。
 游戏从 Games 卡片进入；原有工具、网络、时钟及设置继续可用。
+
+## 桌宠
+
+主页选择 **Desktop Pet**，桌宠占满 128×64 屏幕。Up/Down 切换样式，Enter 单击开心、
+双击喂食、长按睡觉；睡眠时任意键先唤醒，Up+Down 返回主页。
+桌宠会自然呼吸、眨眼和四处看，闲置 60 秒睡觉。
+
+在 `/home/kk/kk_data/rust_project/wl1-studio` 运行桌面版，打开 **ESP-C3 桌宠**，
+连接 `/dev/ttyACM0`，即可切换四种内置样式、触发八种动作，或编辑自己的动画。
+工作台支持逐帧绘制、图片转单色、JSON 导入导出和下载到设备；浏览器版可离线设计预览。
+自定义动画及所选样式保存到 NVS，断开上位机后继续播放。
+重启进入主页，再次打开桌宠会使用保存的样式。
+
+![四种内置桌宠及动作](docs/previews/pets.png)
+
+使用步骤、动作映射和上传协议见 [桌宠模式](docs/pet-mode.md)。
 
 ## 游戏
 

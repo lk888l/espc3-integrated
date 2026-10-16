@@ -20,7 +20,7 @@ def healthy(state, baseline):
 def games_home(device):
     device.home()
     state = device.status()
-    for _ in range((-state["selected"]) % 5):
+    for _ in range((-state["selected"]) % 6):
         device.key("down")
     state = device.status()
     assert state["ui"] == HOME and state["selected"] == 0, state

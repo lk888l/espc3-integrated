@@ -115,6 +115,12 @@ void icon(Canvas& c, Icon icon, int x, int y)
 {
     switch (icon)
     {
+        case Icon::pet:
+            c.rounded(x + 1, y + 5, 9, 14, set, true);
+            c.rounded(x + 14, y + 5, 9, 14, set, true);
+            c.rect(x + 5, y + 9, 3, 6, clear, true);
+            c.rect(x + 18, y + 9, 3, 6, clear, true);
+            break;
         case Icon::games:
             c.rounded(x, y + 3, 23, 16);
             c.line(x + 4, y + 11, x + 10, y + 11);
@@ -278,6 +284,11 @@ void view(Canvas& c, const Model& m, const Telemetry& t, View v, int x, uint32_t
         list(c, m, t, v, x, interactive);
         return;
     }
+    if (v == View::pet)
+    {
+        m.pet().draw(c, now, x);
+        return;
+    }
     if (v >= View::dino && v <= View::flappy)
     {
         // The session remains available while the page slides out to the game list.
@@ -416,6 +427,11 @@ void render(Frame& frame, const Model& model, const Telemetry& telemetry, uint32
         canvas.text(34, 20, "C3 GAMEBOX", true);
         canvas.text(25, 39, "ESP-IDF / C++20");
         canvas.line(18, 52, 18 + int(now % 600) * 92 / 600, 52);
+        return;
+    }
+    if (model.view() == View::pet)
+    {
+        model.pet().draw(canvas, now);
         return;
     }
     if (model.motion().page_x.settled())

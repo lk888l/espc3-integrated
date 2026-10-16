@@ -35,6 +35,9 @@ class Device:
         log.parent.mkdir(parents=True, exist_ok=True)
         self.log = log.open("w", encoding="utf-8")
         self.capture(1.0)
+        self.port.write(b"\x15")  # discard partial console input left by a previous USB owner
+        self.port.flush()
+        self.capture(0.1)
 
     def close(self):
         self.port.close()
@@ -102,7 +105,7 @@ class Device:
     def open_home_card(self, index):
         self.home()
         state = self.status()
-        for _ in range((index - state["selected"]) % 5):
+        for _ in range((index - state["selected"]) % 6):
             self.key("down")
         self.key("enter")
 

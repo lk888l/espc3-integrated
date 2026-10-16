@@ -83,4 +83,28 @@ int main(int argc, char** argv)
         std::snprintf(name, sizeof(name), "animation-%02u.pgm", i);
         save(frame, root / name);
     }
+    model.open(View::pet);
+    for (unsigned style = 0; style < PetSession::builtin_styles; ++style)
+    {
+        model.pet().select(uint8_t(style), now);
+        for (unsigned action = 0; action < unsigned(PetAction::count); ++action)
+        {
+            model.pet().act(PetAction(action), now);
+            render(frame, model, t, now);
+            save(frame, root / ("pet-" + std::to_string(style) + "-" +
+                                std::string(pet_action_name(PetAction(action))) + ".pgm"));
+        }
+    }
+    model.pet().select(0, now);
+    for (unsigned i = 0; i < 64; ++i)
+    {
+        if (i == 40) model.pet().act(PetAction::happy, now);
+        if (i == 56) model.pet().act(PetAction::dance, now);
+        model.tick(now);
+        render(frame, model, t, now);
+        char name[40];
+        std::snprintf(name, sizeof(name), "pet-animation-%02u.pgm", i);
+        save(frame, root / name);
+        now += 100;
+    }
 }

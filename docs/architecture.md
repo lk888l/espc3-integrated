@@ -50,7 +50,7 @@ Wi-Fi、Flash 和 SPI 都会影响表现。
 
 保留 carousel_x、page_x、cursor_y、cursor_width、scroll_y 五个动画值。
 动画接受新的 Pressed，Released/Click 不重复确认。
-主页五卡片为 Games / Tools / Network / Clock / Settings。
+主页六卡片为 Games / Tools / Network / Clock / Settings / Desktop Pet。
 字体、布局和宠物两帧来自相同参考工程。
 
 ## 屏幕
@@ -94,3 +94,17 @@ Piano 的可选 LEDC 适配位于 device_app，core 只发布音符与单调递�
 UI 快照增加游戏状态及栈历史最低余量，控制台注入按下/释放/长按等事件仍走按键队列。
 GPIO LL 访问限制在输入与 SWD 适配器，升级 SDK 后需复核。
 不需要 LVGL、Arduino、下载字体或组件管理器。
+
+## 桌宠
+
+`PetSession` 位于 core；View::pet 追加在旧页面枚举之后，不改变游戏编号。
+桌宠直接绘制全屏，进入与退出不进行双页拼接。内置宠物由几何图形绘制，
+自定义 PET1 动画为 64×32 位图，以 2 倍像素显示；包最多 6208 字节、24 帧。
+PetSession 借用 UI 所有者持有的 PetPack，Model 栈不包含大块动画存储。
+
+USB `pet` 命令通过请求/结果队列将样式、动作和资源安装交给 UI 唯一所有者。
+包在 console 任务的暂存区顺序接收，验证大小、CRC32、schema 后一次写入 NVS，
+再把所有权交给 UI；中断或无效上传不替换当前宠物。快照仅包含样式、动作、序号、
+资源长度，console 不并发读取渲染中的包。选择样式由 storage 任务合并保存。
+当前 NVS 分区可容纳最大包的反复替换，测试包含连续两次 6208 字节上传和重启读取。
+Ctrl-U 丢弃未完成的控制台输入，供上位机重连时安全开始新的命令。

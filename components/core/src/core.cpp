@@ -154,7 +154,8 @@ std::span<const Entry> menu(View view)
         {"Tools", "INPUT/TIMERS", View::tools, Action::open, Icon::tools},
         {"Network", "WI-FI & NTP", View::network, Action::open, Icon::network},
         {"Clock", "NETWORK TIME", View::clock, Action::open, Icon::clock},
-        {"Settings", "PERSONALIZE", View::settings, Action::open, Icon::settings}};
+        {"Settings", "PERSONALIZE", View::settings, Action::open, Icon::settings},
+        {"Desktop Pet", "FULL SCREEN", View::pet, Action::open, Icon::pet}};
     static constexpr Entry games[] = {
         {"Dino", "", View::dino, Action::open, Icon::games},
         {"Snake", "", View::snake, Action::open, Icon::games},
@@ -195,7 +196,7 @@ std::string_view title(View v)
     static constexpr std::string_view names[] = {
         "C3 GAMEBOX", "TOOLS",     "NETWORK", "CLOCK",     "SETTINGS", "STOPWATCH",
         "COUNTDOWN",  "INPUT LAB", "SYSTEM",  "WI-FI DAP", "ABOUT", "GAMES",
-        "DINO", "SNAKE", "AIR RAID", "TETRIS", "PONG", "PIANO", "BREAKOUT", "FLAPPY"};
+        "DINO", "SNAKE", "AIR RAID", "TETRIS", "PONG", "PIANO", "BREAKOUT", "FLAPPY", "DESKTOP PET"};
     static_assert(std::size(names) == unsigned(View::count));
     return unsigned(v) < unsigned(View::count) ? names[unsigned(v)] : "";
 }
@@ -228,6 +229,7 @@ void Model::tick(uint32_t now)
         if (bonus_game()) bonus_.tick(now);
         else game_.tick(now);
     }
+    if (view_ == View::pet) pet_.tick(now);
 }
 void Model::handle(KeyEvent event)
 {
@@ -244,6 +246,15 @@ void Model::handle(KeyEvent event)
         if (event.key == Key::back && event.gesture == Gesture::pressed) back();
         else if (bonus_game()) bonus_.handle(event);
         else game_.handle(event);
+        return;
+    }
+    if (view_ == View::pet)
+    {
+        if (event.key == Key::back && (event.gesture == Gesture::pressed ||
+                                       event.gesture == Gesture::long_press))
+            back();
+        else
+            pet_.handle(event);
         return;
     }
     if (event.gesture == Gesture::long_press && (event.key == Key::enter || event.key == Key::back))
@@ -382,6 +393,7 @@ void Model::confirm()
 }
 void Model::open(View next, bool forward)
 {
+    if (next == View::pet) booting_ = false;
     if (next == view_ || unsigned(next) >= unsigned(View::count)) return;
     if (view_ == View::debug)
     {
@@ -399,10 +411,12 @@ void Model::open(View next, bool forward)
         if (bonus_game()) bonus_.reset(next == View::flappy, seed);
         else game_.reset(GameId(unsigned(next) - unsigned(View::dino)), seed);
     }
+    if (next == View::pet) pet_.select(pet_.style(), now_);
     forward_ = forward;
     motion_.carousel_x.snap(0);
     motion_.page_x.snap(int16_t(forward ? 128 : -128));
     motion_.page_x.target(0);
+    if (next == View::pet || previous_view_ == View::pet) motion_.page_x.snap(0);
     update_targets(true);
     if (next == View::debug)
     {
@@ -416,7 +430,8 @@ void Model::back()
     const auto destination = view_ == View::about ? about_parent_
                              : gaming() ? View::games
                              : (view_ == View::tools || view_ == View::network ||
-                                view_ == View::clock || view_ == View::settings || view_ == View::games)
+                                view_ == View::clock || view_ == View::settings || view_ == View::games ||
+                                view_ == View::pet)
                                  ? View::home
                                  : View::tools;
     open(destination, false);

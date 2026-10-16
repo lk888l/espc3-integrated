@@ -1,1 +1,1 @@
-idf_component_register(SRCS "src/modules.cpp" "src/console.cpp" "src/piano_audio.cpp" INCLUDE_DIRS "include" REQUIRES app core board display network debug_probe nvs_flash console esp_driver_gpio esp_driver_ledc esp_driver_usb_serial_jtag vfs esp_system esp_timer)
+idf_component_register(SRCS "src/modules.cpp" "src/console.cpp" "src/pet_console.cpp" "src/piano_audio.cpp" INCLUDE_DIRS "include" REQUIRES app core board display network debug_probe nvs_flash console esp_driver_gpio esp_driver_ledc esp_driver_usb_serial_jtag vfs esp_system esp_timer)

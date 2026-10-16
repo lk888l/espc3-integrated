@@ -43,7 +43,7 @@ void menu_and_lifecycle_tests()
     uint32_t now = 0;
     model.tick(now);
     model.tick(now = 600);
-    assert(menu(View::home).size() == 5 && menu(View::home)[0].view == View::games);
+    assert(menu(View::home).size() == 6 && menu(View::home)[0].view == View::games);
     assert(menu(View::games).size() == game_views.size());
     assert(model.game_index() == 255);
     model.handle(event(Key::enter, ++now));
