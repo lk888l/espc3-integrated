@@ -2,13 +2,13 @@
 
 当前已通过 /dev/ttyACM0 烧录用户的 ESP32-C3，并实测 USB 菜单逻辑、
 NVS、Wi-Fi STA、自动/手动校时及无线 DAP 协议。见[验证记录](validation.md)。
-目前只有 USB 连接，没有接 OLED、实体按键或外部 MCU；
-下面涉及显示、按键电气响应和真实 SWD 目标的步骤仍待接线后验证。
+自动化检查通过 USB 注入按键事件，不能据此确认 OLED、实体按键或外部 MCU 的接线；
+下面涉及显示、按键电气响应和真实 SWD 目标的步骤仍需实测。
 
 ## OLED
 
 1. 核对 3V3/GND、4/6/7 时钟/数据/CS 和 10/5 DC/RES，模块为四线 SPI。
-2. 检查开机、四主页、列表、Clock/Network 显示。
+2. 检查开机、六张主页卡片、列表、Clock/Network 显示。
 3. 动画中快速导航、Enter 确认应有效。
 4. 比较 Full/Reduced/Off 与 STM-GameBox 的回弹、滑入、光标形态。
 5. System 的 SPI 耗时与计数不是面板可见刷新率。
@@ -17,7 +17,10 @@ NVS、Wi-Fi STA、自动/手动校时及无线 DAP 协议。见[验证记录](va
 
 ## 按键
 
-1. 三键响应，Up+Down 每次组合只返回一次，释放后再触发。
+1. 四键 Up=GPIO0、Down=GPIO1、Enter=GPIO3、Back=GPIO2；各按键常开接 GND。
+   GPIO2 建议 10 kΩ 上拉至 3V3，上电/复位时松开退出键；确认启动和 USB 烧录正常。
+   每次单击 Back 只返回一级，持续按住超过 1 秒不继续退页，松开再按才返回下一级。
+   游戏准备/进行/暂停/结束和桌宠休眠时均可退出；Up+Down 和普通页面长按 Enter 不再返回。
 2. 去抖窗口内抖动不重复 Press；Press/Release 配对。
 3. 650 ms 长按，110 ms 首次重复延时、90 ms 重复周期；调度量化和抢占影响实测。
 4. 动画、SNTP、设置保存和 DAP 大量请求同时运行，观察 drops/late。

@@ -68,14 +68,13 @@ void button_tests()
     assert(wrapping.sample(mask(Key::up), start, out) == 0);
     assert(wrapping.sample(mask(Key::up), uint32_t(start + 20), out) == 1 &&
            out[0].gesture == Gesture::pressed);
-    BackChord chord;
+    ButtonBank directions;
     const std::array<KeyEvent, 2> pair_events = {KeyEvent{Key::up, Gesture::pressed, 100, 0},
                                                  KeyEvent{Key::down, Gesture::pressed, 100, 0}};
-    assert(chord.route(pair_events, mask(Key::up) | mask(Key::down), 100, out) == 1);
-    assert(out[0].key == Key::back && out[0].gesture == Gesture::pressed);
-    assert(chord.route(pair_events, mask(Key::up) | mask(Key::down), 200, out) == 0);
-    assert(chord.route({}, 0, 220, out) == 0);
-    assert(chord.route(pair_events, mask(Key::up) | mask(Key::down), 300, out) == 1);
+    assert(directions.sample(mask(Key::up) | mask(Key::down), 80, out) == 0);
+    assert(directions.sample(mask(Key::up) | mask(Key::down), 100, out) == 2);
+    for (unsigned i = 0; i < pair_events.size(); ++i)
+        assert(out[i].key == pair_events[i].key && out[i].gesture == Gesture::pressed);
     ButtonConfig invalid;
     invalid.debounce_ms = 0;
     assert(!invalid.valid());
@@ -132,6 +131,9 @@ void model_tests()
     model.handle({Key::down, Gesture::pressed, 2000, 0});
     assert(model.probe_clock() == 250000 && (model.take_effects() & set_probe_clock));
     model.handle({Key::enter, Gesture::long_press, 2650, 650});
+    assert(model.view() == View::debug && model.probe_wanted());
+    assert(!(model.take_effects() & stop_probe));
+    model.handle({Key::back, Gesture::pressed, 2651, 0});
     assert(model.view() == View::tools && (model.take_effects() & stop_probe));
     model.open(View::stopwatch);
     model.handle({Key::enter, Gesture::pressed, 0xfffffff0, 0});
@@ -147,6 +149,85 @@ void model_tests()
     bad.brightness = 255;
     Model safe(bad);
     assert(safe.settings().valid());
+}
+void exit_button_tests()
+{
+    // Run the real debounce/gesture recognizer through every page. A sustained
+    // Back press must return exactly one level even after long/repeat/release.
+    constexpr std::array parents = {
+        View::home, View::home, View::home, View::home, View::home,
+        View::tools, View::tools, View::tools, View::tools, View::tools,
+        View::settings, View::home, View::games, View::games, View::games,
+        View::games, View::games, View::games, View::games, View::games, View::home};
+    static_assert(parents.size() == unsigned(View::count));
+    for (unsigned v = 0; v < parents.size(); ++v)
+    {
+        Model model;
+        model.tick(0);
+        model.tick(600);
+        if (View(v) == View::about) model.open(View::settings);
+        model.open(View(v));
+        model.take_effects();
+        ButtonBank bank;
+        std::array<KeyEvent, 32> events{};
+        const auto sample = [&](uint8_t raw, uint32_t now)
+        {
+            const auto count = bank.sample(raw, now, events);
+            for (unsigned i = 0; i < count; ++i) model.handle(events[i]);
+        };
+        sample(mask(Key::back), 700);
+        sample(mask(Key::back), 719);
+        assert(model.view() == View(v));
+        sample(mask(Key::back), 720);
+        assert(model.view() == parents[v]);
+        if (View(v) == View::debug)
+            assert(!model.probe_wanted() && (model.take_effects() & stop_probe));
+        for (uint32_t now = 725; now <= 1800; now += 5)
+        {
+            sample(mask(Key::back), now);
+            assert(model.view() == parents[v]);
+        }
+        sample(0, 1805);
+        sample(0, 1825);
+        sample(0, 2200);
+        assert(model.view() == parents[v]);
+        // A second physical tap is a new request, and its delayed Click must
+        // not skip a level either.
+        sample(mask(Key::back), 2300);
+        sample(mask(Key::back), 2320);
+        const auto second = model.view();
+        assert(second == View::home);
+        sample(0, 2340);
+        sample(0, 2360);
+        sample(0, 2640);
+        assert(model.view() == second);
+    }
+
+    for (const auto view : {View::tools, View::network, View::clock, View::settings,
+                            View::stopwatch, View::countdown, View::input_lab,
+                            View::system, View::debug, View::about, View::games})
+    {
+        Model model;
+        model.tick(0);
+        model.tick(600);
+        model.open(view);
+        model.handle({Key::enter, Gesture::long_press, 1300, 650});
+        assert(model.view() == view);
+        ButtonBank bank;
+        std::array<KeyEvent, 32> events{};
+        bank.sample(mask(Key::up) | mask(Key::down), 1400, events);
+        const auto count = bank.sample(mask(Key::up) | mask(Key::down), 1420, events);
+        for (unsigned i = 0; i < count; ++i) model.handle(events[i]);
+        assert(model.view() == view);
+    }
+
+    Model about;
+    about.tick(0);
+    about.tick(600);
+    about.open(View::tools);
+    about.open(View::about);
+    about.handle({Key::back, Gesture::pressed, 700, 0});
+    assert(about.view() == View::tools);
 }
 void render_tests()
 {
@@ -189,6 +270,7 @@ int main()
     button_tests();
     spring_tests();
     model_tests();
+    exit_button_tests();
     render_tests();
     static_assert(board_gpio(4) && board_gpio(6) && board_gpio(7) && board_gpio(20));
     static_assert(!board_gpio(18) && !board_gpio(19) && !board_gpio(12));

@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | 工厂 | create_* | 主入口不依赖具体模块类 |
 | 模板方法/生命周期 | AppModule / AppManager | 初始化、回滚、失败保留 |
-| 状态机 | ButtonBank / BackChord / Model / TCP | 有界、可重复验证的事件处理 |
+| 状态机 | ButtonBank / Model / TCP | 有界、可重复验证的事件处理 |
 | 硬件适配器 | Oled / network / debug_probe | 核心不包含 ESP-IDF API |
 | 消息队列 | 按键 64 项、设置/凭据各 1 项 | 单一所有者、非阻塞提交 |
 | 快照 | 网络、DAP、UI 状态、Runtime 统计 | UI 和控制台不共享可变业务对象 |
@@ -38,7 +38,9 @@ C3 单核：SWD 不禁用全局中断或跨传输持有临界区，UI 可抢占 
 按键队列给 Pressed/Released/LongPress 预留八个位置，
 拥塞时先拒绝 Repeat/Click/DoubleClick，并统计所有提交失败。
 满队列仍可能丢事件，Input Lab/status 可查看 drops 和 late。
-Up+Down 组合转换成一次 Back，两个键释放后才可再次触发。
+GPIO2 为独立 Back 输入，去抖后的 Pressed 在 Model 中统一返回一级。
+Back 的 Released/Click/DoubleClick/LongPress/Repeat 均不导航，避免按住后跨页面连退。
+Up+Down 保留为两个方向事件，不再合成返回；普通页面长按 Enter 不再返回。
 
 ## 动画
 
@@ -84,7 +86,8 @@ GameSession 保存六款参考游戏，BonusSession 保存新增 Breakout / Flap
 仅当前游戏推进模拟；暂停冻结游戏状态，恢复重新安排时钟，退出后重新进入为新局。
 原六款按各自周期推进，每次最多追赶六步；新增两款使用 16 ms 固定步长、
 最多追赶 128 ms，避免阻塞后无限追帧。游戏输入在全局快捷键之前路由，
-因此长按 Enter 暂停不会触发普通页面返回；Up+Down 仍经过 BackChord 返回。
+因此游戏长按 Enter 仍用于暂停。Back 在游戏、桌宠及普通页面路由之前统一处理，
+准备、进行、暂停和结束状态都能单击退出；退出 DAP 页仍经 open 清理服务。
 Tetris 的 Enter 只在最终 Click 时旋转、DoubleClick 时硬降，Pressed 不改变方块。
 InputTask 根据 UI 快照为 Tetris 的 Enter 使用 150 ms 判定窗口，其余页面和按键
 保留 280 ms；窗口在首次释放时锁存，已有手势不会因切页改变判定时限。

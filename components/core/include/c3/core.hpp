@@ -71,17 +71,6 @@ class ButtonBank
     ButtonConfig config_;
 };
 
-// Three physical keys can return with Up+Down, without confirming Enter first.
-class BackChord
-{
-   public:
-    std::size_t route(std::span<const KeyEvent> events, uint8_t stable, uint32_t now,
-                      std::span<KeyEvent> output);
-
-   private:
-    bool active_ = false;
-};
-
 enum class Motion : uint8_t
 {
     off,

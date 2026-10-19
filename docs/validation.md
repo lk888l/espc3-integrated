@@ -1,5 +1,48 @@
 # 验证记录
 
+## 2026-10-19：独立单击退出键，固件 1.2.0
+
+已读取 NAS 原始引脚图，与 `docs/hardware/pinout.png` 的 SHA-256 一致。
+保留 OLED、Up=0 / Down=1 / Enter=3、SWD=20/21 和原生 USB 接线，
+将原先空闲的 GPIO2 分配给低电平有效的 Back / Exit 常开按键，另一端接 GND。
+GPIO2 建议通过 10 kΩ 上拉至 3V3，上电和复位时松开按钮；GPIO8/9 保留给板载 LED/BOOT。
+只有 Back 输入获得 GPIO2 例外，全局启动配置脚覆盖选项仍关闭，冲突检查继续有效。
+
+普通页面、八款游戏及桌宠统一在 Back 的去抖 Pressed 上返回一级；
+长按、重复及尾随 Click/DoubleClick/Released 不再造成跨页面连续返回。
+移除 Up+Down 组合返回及普通页面长按 Enter 返回，保留游戏长按暂停和桌宠长按睡觉。
+同步屏幕提示、接线及操作文档，并重新导出检查了菜单和游戏预览。
+
+| 检查 | 结果 |
+| --- | --- |
+| ESP-IDF v5.5.4 / Docker esp-dev | 最终编译通过；目标 ESP32-C3，固件 1.2.0 |
+| /dev/ttyACM0 烧录 | ESP32-C3 rev0.4，4 MB Flash；写入哈希校验通过，正常复位运行 |
+| ASan/UBSan 主机 CTest | 全部 8 项通过；覆盖全部页面、20 ms 去抖、持续按住不连退、再次按下返回、旧快捷键移除及 DAP 停止效果 |
+| 实际 board.hpp 引脚编译检查 | 14 种配置通过预期断言；默认 GPIO2 可用，拒绝 GPIO8/9、USB、SWD、屏幕、蜂鸣器冲突及其他用途绕过 GPIO2 保护 |
+| exit_smoke.py | 13 组通过；全部普通页面、About 两个来源、8 款游戏的准备/进行/暂停状态、清醒/睡眠桌宠、Back 尾随手势、DAP 退出停止及资源健康 |
+| serial_smoke.py | 6 组通过；计时器、菜单、NVS 两次重启、Wi-Fi/DAP 生命周期，原设置恢复 |
+| game_smoke.py | 11 组通过；8 款游戏开始、输入、暂停、继续、退出重进及 40 次菜单输入 |
+| tetris_smoke.py | 6 组通过；单击旋转、双击硬降、长按暂停及开始/继续的尾随手势隔离 |
+
+四套串口检查在同一最终固件上连续通过，共 36 组；
+同时修正原 `serial_smoke.py` 对 Tools 初始选中项的假设，使其可接在退出专项之后运行。
+最终设备停在 Games 主页卡片，DAP 关闭，Wi-Fi 与原显示设置保留；
+空闲堆 141048 B、该次启动历史最低堆 137004 B，UI 栈历史最低余量 4428 B，
+按键 drops=0、SPI errors=0。退出专项单独运行时 UI 栈最低余量为 4420 B。
+
+串口测试注入已识别的事件，去抖和持续按住由主机真实 `ButtonBank` 采样序列验证。
+尚不能据此确认实体退出按键的接线、触点抖动及按住复位的电气表现，需接线后实际按动验证。
+
+最终应用 bin 为 958880 字节，SHA-256：
+
+```text
+58717b3bdf9654210882851755b3b6e99e29ee63a0f3f566f964bebf491e6385
+```
+
+构建及回归日志：`build-exit-host.log`、`build-exit-flash.log`、`build-exit-regression.log`。
+串口日志与 JSON 结果：`build/hardware/exit/{exit,serial,game,tetris}-smoke.{log,json}`；
+引脚检查结果：`build/hardware/exit/pin-policy.json`。
+
 ## 2026-10-16：全屏桌宠及 wl1-studio 编辑器
 
 四种内置宠物、八种动作、物理按键互动与 PET1 自定义动画上传完成。

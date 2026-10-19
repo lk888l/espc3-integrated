@@ -92,26 +92,6 @@ uint8_t ButtonBank::stable_mask() const
         if (states_[i].stable) result |= uint8_t(1U << i);
     return result;
 }
-std::size_t BackChord::route(std::span<const KeyEvent> events, uint8_t stable, uint32_t now,
-                             std::span<KeyEvent> output)
-{
-    constexpr auto pair = mask(Key::up) | mask(Key::down);
-    const bool previous = active_;
-    std::size_t count = 0;
-    if ((stable & pair) == pair)
-    {
-        if (!active_ && !output.empty()) output[count++] = {Key::back, Gesture::pressed, now, 0};
-        active_ = true;
-    }
-    else if (!(stable & pair))
-        active_ = false;
-    for (const auto& event : events)
-    {
-        if ((previous || active_) && (event.key == Key::up || event.key == Key::down)) continue;
-        if (count < output.size()) output[count++] = event;
-    }
-    return count;
-}
 void Spring::step(Motion speed)
 {
     if (speed == Motion::off)
@@ -241,25 +221,22 @@ void Model::handle(KeyEvent event)
         if (event.gesture == Gesture::pressed) booting_ = false;
         return;
     }
+    // Handle Back before every page-specific route. Only the debounced press
+    // navigates: a hold, repeat or delayed click must not exit another level.
+    if (event.key == Key::back)
+    {
+        if (event.gesture == Gesture::pressed) back();
+        return;
+    }
     if (gaming())
     {
-        if (event.key == Key::back && event.gesture == Gesture::pressed) back();
-        else if (bonus_game()) bonus_.handle(event);
+        if (bonus_game()) bonus_.handle(event);
         else game_.handle(event);
         return;
     }
     if (view_ == View::pet)
     {
-        if (event.key == Key::back && (event.gesture == Gesture::pressed ||
-                                       event.gesture == Gesture::long_press))
-            back();
-        else
-            pet_.handle(event);
-        return;
-    }
-    if (event.gesture == Gesture::long_press && (event.key == Key::enter || event.key == Key::back))
-    {
-        back();
+        pet_.handle(event);
         return;
     }
     if (event.key == Key::function && event.gesture == Gesture::double_click)
@@ -273,11 +250,6 @@ void Model::handle(KeyEvent event)
         return;
     }
     if (event.gesture != Gesture::pressed && event.gesture != Gesture::repeat) return;
-    if (event.key == Key::back)
-    {
-        back();
-        return;
-    }
     if (event.key == Key::function)
     {
         if (view_ == View::stopwatch) reset_stopwatch();

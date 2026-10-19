@@ -14,8 +14,9 @@ C3 作为外部 MCU 的 CMSIS-DAP 探针，OpenOCD 提供 Flash 算法和 GDB。
 
 目标自行供电，仅直接连接 3.3 V 逻辑。板上没有 VTref 或电平转换。
 用短线、100 kHz 上限开始。已用 GPIO 不可兼作 NRST。
-需要 NRST 时，可在核对启动电平后显式允许并选空闲 GPIO2，或调整其他接线。
-GPIO2/8/9 的默认禁用保护不会被自动绕过。
+GPIO2 已分配给独立退出键，不能再作 NRST。需要 NRST 时应调整接线，
+或核对 GPIO8/9 的启动电平及板载 LED/BOOT 连接后显式允许使用。
+全局 `C3_ALLOW_STRAPPING_PINS` 仍默认关闭，仅 GPIO2 作为 Back 输入有专用例外，冲突检查保持有效。
 
 Tools → Wi-Fi DAP 启用服务；主菜单默认不开放 TCP/UDP。
 暂停、返回、TCP EOF、帧头错误或请求收发超时释放引脚。

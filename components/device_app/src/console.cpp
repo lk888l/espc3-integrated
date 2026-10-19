@@ -3,6 +3,7 @@
 #include <cstring>
 
 #include "app_task.hpp"
+#include "c3/board.hpp"
 #include "c3/device_app.hpp"
 #include "c3/network.hpp"
 #include "c3/probe.hpp"
@@ -30,6 +31,8 @@ int status_command(int, char**)
                 (unsigned long)esp_get_free_heap_size(),
                 (unsigned long)esp_get_minimum_free_heap_size(), net.wifi_enabled, net.sta_ip,
                 net.time, net.time_synced);
+    std::printf("key_up_gpio=%d key_down_gpio=%d key_enter_gpio=%d key_back_gpio=%d\n",
+                CONFIG_C3_KEY_UP, CONFIG_C3_KEY_DOWN, CONFIG_C3_KEY_ENTER, CONFIG_C3_KEY_BACK);
     if (runtime)
     {
         std::printf(

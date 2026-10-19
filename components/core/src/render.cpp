@@ -306,7 +306,7 @@ void view(Canvas& c, const Model& m, const Telemetry& t, View v, int x, uint32_t
                    t.time_synced         ? "SNTP SYNCED"
                    : t.station_connected ? "WAITING FOR NTP"
                                          : "JOIN WI-FI TO SYNC");
-            footer(c, x, "OK SYNC UP+DN BACK");
+            footer(c, x, "OK SYNC  BACK EXIT");
             break;
         case View::network:
             if (!t.wifi_enabled)
@@ -328,7 +328,7 @@ void view(Canvas& c, const Model& m, const Telemetry& t, View v, int x, uint32_t
                     std::snprintf(buffer, sizeof(buffer), "STA OFF / USB CFG");
                 c.text(x + 4, 44, buffer);
             }
-            footer(c, x, "OK SYNC UP+DN BACK");
+            footer(c, x, "OK SYNC  BACK EXIT");
             break;
         case View::stopwatch:
         {
@@ -370,7 +370,7 @@ void view(Canvas& c, const Model& m, const Telemetry& t, View v, int x, uint32_t
             std::snprintf(buffer, sizeof(buffer), "DROP %lu LATE %lu", (unsigned long)t.key_drops,
                           (unsigned long)t.input_late);
             c.text(x + 5, 39, buffer);
-            footer(c, x, "20MS DB UP+DN BACK");
+            footer(c, x, "20MS DB  BACK EXIT");
             break;
         }
         case View::system:
@@ -406,7 +406,7 @@ void view(Canvas& c, const Model& m, const Telemetry& t, View v, int x, uint32_t
             footer(c, x, "UP/DN RATE OK PAUSE");
             break;
         case View::about:
-            c.text(x + 10, 17, "C3 GAMEBOX 1.1.2");
+            c.text(x + 10, 17, "C3 GAMEBOX 1.2.0");
             c.text(x + 10, 29, "SSD1306 / 128X64");
             c.text(x + 10, 41, "ESP-IDF / C++20");
             footer(c, x, "GAMEBOX MOTION PORT");

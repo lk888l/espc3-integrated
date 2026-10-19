@@ -209,8 +209,7 @@ class InputTask final : public AppTask
     void main() override
     {
         ButtonBank bank;
-        BackChord chord;
-        std::array<KeyEvent, 32> events{}, routed{};
+        std::array<KeyEvent, 32> events{};
         TickType_t next = xTaskGetTickCount();
         while (!should_exit())
         {
@@ -225,19 +224,13 @@ class InputTask final : public AppTask
             const auto count = bank.sample(pressed, now_ms(), events, enter_window);
             runtime_.stable_keys = bank.stable_mask();
             runtime_.key_events.fetch_add(count);
-            const auto routed_count =
-                CONFIG_C3_KEY_BACK < 0
-                    ? chord.route(std::span<const KeyEvent>(events.data(), count),
-                                  bank.stable_mask(), now_ms(), routed)
-                    : count;
-            if (CONFIG_C3_KEY_BACK >= 0) std::copy_n(events.begin(), count, routed.begin());
-            for (unsigned i = 0; i < routed_count; ++i)
+            for (unsigned i = 0; i < count; ++i)
             {
-                const auto gesture = routed[i].gesture;
+                const auto gesture = events[i].gesture;
                 const bool optional = gesture == Gesture::repeat || gesture == Gesture::click ||
                                       gesture == Gesture::double_click;
                 if ((optional && uxQueueSpacesAvailable(runtime_.keys) <= 8) ||
-                    xQueueSend(runtime_.keys, &routed[i], 0) != pdTRUE)
+                    xQueueSend(runtime_.keys, &events[i], 0) != pdTRUE)
                     runtime_.key_drops.fetch_add(1);
             }
             pace(next, pdMS_TO_TICKS(CONFIG_C3_INPUT_PERIOD_MS), &runtime_.input_late);

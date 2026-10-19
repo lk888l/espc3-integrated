@@ -606,14 +606,14 @@ void GameSession::draw_overlay(Canvas& c, int x) const
         centered(c, x, 17, "READY");
         centered(c, x, 28, hint1[unsigned(id_)]);
         centered(c, x, 38, hint2[unsigned(id_)]);
-        centered(c, x, 51, "ENTER START");
+        centered(c, x, 51, "ENTER GO / BACK EXIT");
     }
     else if (status_ == GameStatus::paused)
     {
         centered(c, x, 17, "PAUSED");
         centered(c, x, 28, "ENTER: RESUME");
         centered(c, x, 39, "UP: RESTART");
-        centered(c, x, 51, "UP+DOWN: BACK");
+        centered(c, x, 51, "BACK: EXIT");
     }
     else
     {
@@ -622,7 +622,7 @@ void GameSession::draw_overlay(Canvas& c, int x) const
         std::snprintf(text, sizeof(text), "SCORE %lu", static_cast<unsigned long>(score_));
         centered(c, x, 28, text);
         centered(c, x, 39, "ENTER: RESTART");
-        centered(c, x, 51, "UP+DOWN: BACK");
+        centered(c, x, 51, "BACK: EXIT");
     }
 }
 void GameSession::draw(Canvas& c, int x) const

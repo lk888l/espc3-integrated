@@ -156,8 +156,10 @@ def main():
         passed("USB console and runtime health")
 
         device.open_home_card(1)
-        assert device.status()["ui"] == 1
-        device.key("down")
+        tools = device.status()
+        assert tools["ui"] == 1, tools
+        for _ in range((1 - tools["selected"]) % 6):
+            device.key("down")
         device.key("enter")
         assert device.status()["ui"] == 6
         device.key("enter")

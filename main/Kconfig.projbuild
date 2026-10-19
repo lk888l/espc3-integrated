@@ -37,9 +37,16 @@ menu "C3 GameBox"
             range -1 21
             default 3
         config C3_KEY_BACK
-            int "Back GPIO (-1 = disabled)"
+            int "Exit / Back GPIO (-1 = disabled)"
             range -1 21
-            default -1
+            default 2
+            help
+                Dedicated active-low exit button: connect GPIO2 to GND through
+                a normally open switch. Add a 10 kohm pull-up to 3.3 V so GPIO2
+                is high during reset; release the button when powering up.
+                One debounced press returns one level, including in games/pets.
+                GPIO2 is allowed only for this input without the global
+                strapping-pin override. GPIO8/9 remain protected.
         config C3_KEY_LEFT
             int "Left GPIO (-1 = disabled)"
             range -1 21
@@ -81,7 +88,8 @@ menu "C3 GameBox"
             default n
             help
                 These pins affect boot. GPIO8 also drives the onboard LED;
-                GPIO9 is the BOOT button. Defaults leave them unused.
+                GPIO9 is the BOOT button. Defaults reserve GPIO2 for the
+                active-low exit button and leave GPIO8/9 unused.
     endmenu
     menu "Network"
         config C3_WIFI_SSID

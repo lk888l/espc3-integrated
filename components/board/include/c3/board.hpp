@@ -28,6 +28,9 @@ constexpr bool valid_plan()
     for (unsigned i = 0; i < pins.size(); ++i)
     {
         if (pins[i] == -1 && i >= 7) continue;
+        // Only the active-low Back input gets a GPIO2 exception. The uniqueness
+        // check below still rejects any other function sharing that pin.
+        if (pins[i] == 2 && CONFIG_C3_KEY_BACK == 2) continue;
         if (!board_gpio(pins[i], allow_strapping)) return false;
     }
     return unique_pins(pins);

@@ -342,24 +342,25 @@ void BonusSession::draw(Canvas& canvas, int x) const
 
 void BonusSession::draw_overlay(Canvas& canvas, int x) const
 {
-    canvas.rounded(x + 4, 23, 120, 34, clear, true);
-    canvas.rounded(x + 4, 23, 120, 34);
+    canvas.rounded(x + 4, 15, 120, 48, clear, true);
+    canvas.rounded(x + 4, 15, 120, 48);
     if (status_ == GameStatus::ready)
     {
-        centered(canvas, x, 26, "ENTER: START");
-        centered(canvas, x, 36, flappy_ ? "UP / ENTER: FLAP" : "UP/DOWN: MOVE");
-        centered(canvas, x, 46, "HOLD ENTER: PAUSE");
+        centered(canvas, x, 19, "ENTER: START");
+        centered(canvas, x, 29, flappy_ ? "UP / ENTER: FLAP" : "UP/DOWN: MOVE");
+        centered(canvas, x, 39, "HOLD ENTER: PAUSE");
     }
     else if (status_ == GameStatus::paused)
     {
-        centered(canvas, x, 26, "PAUSED");
-        centered(canvas, x, 36, "ENTER: RESUME");
-        centered(canvas, x, 46, "UP: RESTART");
+        centered(canvas, x, 19, "PAUSED");
+        centered(canvas, x, 29, "ENTER: RESUME");
+        centered(canvas, x, 39, "UP: RESTART");
     }
     else
     {
-        centered(canvas, x, 27, "GAME OVER");
-        centered(canvas, x, 43, "ENTER: RESTART");
+        centered(canvas, x, 23, "GAME OVER");
+        centered(canvas, x, 39, "ENTER: RESTART");
     }
+    centered(canvas, x, 51, "BACK: EXIT");
 }
 }  // namespace c3
