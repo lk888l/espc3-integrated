@@ -1,7 +1,7 @@
 # 架构
 
 保留 ESP-IDF 模板的 AppModule / AppManager / AppTask 生命周期。
-主入口只做组合，初始化顺序 Storage → Network → Probe → Input → UI → Console，
+主入口只做组合，初始化顺序 Storage → Network → Probe → PC Monitor → Input → UI → Console，
 失败时反序清理。任务不能停止时保留模块及运行时存储，避免释放仍在使用的对象。
 
 ## 模式与边界
@@ -28,6 +28,7 @@ NVS 初始化失败会报告错误，不自动擦除已有配置。
 | oled_ui | 4 | 8192 | 默认 5 ms，唯一 UI/屏幕/游戏/Piano PWM 所有者 |
 | network | 3 | 4096 | 25 ms，重连、凭据、SNTP |
 | wifi_dap | 2 | 6144 | 2 ms 轮询，唯一 DAP/SWD 所有者 |
+| pc_monitor | 2 | 6144 | 25 ms 轮询 UDP 4443、限长解析、最新值快照及 ACK |
 | console | 2 | 4096 | 有限时 USB 读取，命令提交请求 |
 | settings | 1 | 3072 | 25 ms，750 ms 静默后保存 |
 
@@ -69,6 +70,9 @@ SSD1306 当前接线没有回读/ACK，SPI 成功不代表屏幕接好，
 ## 网络和时间
 
 回调仅更新短快照和标志，耗时操作留给 network 任务。
+电脑监控由独立 pc_monitor 任务收包，不在 UI 或 Wi-Fi 回调解析。
+UiTask 每 250 ms 在网络快照赋值后合并电脑监控快照，统一绘制 Tools → PC Monitor。
+监控与菜单/USB会话独立；Wi-Fi 关闭时释放 socket，恢复后重新监听，超过 3 秒数据标记过期。
 STA 从 1 s 退避到最多 60 s，AP 保持可访问；RSSI 每秒更新。
 分别跟踪连接中、已关联、已获得 IP，避免 DHCP 等待期间重复调用 connect。
 关联与 DHCP 分别有 15 s / 30 s 截止时间，过期后断开并退避重试。

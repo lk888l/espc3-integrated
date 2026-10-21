@@ -150,6 +150,7 @@ std::span<const Entry> menu(View view)
                                       {"Input Lab", "", View::input_lab, Action::open, Icon::tools},
                                       {"System", "", View::system, Action::open, Icon::tools},
                                       {"Wi-Fi DAP", "", View::debug, Action::open, Icon::network},
+                                      {"PC Monitor", "", View::pc_monitor, Action::open, Icon::network},
                                       {"About", "", View::about, Action::open, Icon::settings}};
     static constexpr Entry settings[] = {
         {"Motion", "", View::settings, Action::motion, Icon::settings},
@@ -176,7 +177,7 @@ std::string_view title(View v)
     static constexpr std::string_view names[] = {
         "C3 GAMEBOX", "TOOLS",     "NETWORK", "CLOCK",     "SETTINGS", "STOPWATCH",
         "COUNTDOWN",  "INPUT LAB", "SYSTEM",  "WI-FI DAP", "ABOUT", "GAMES",
-        "DINO", "SNAKE", "AIR RAID", "TETRIS", "PONG", "PIANO", "BREAKOUT", "FLAPPY", "DESKTOP PET"};
+        "DINO", "SNAKE", "AIR RAID", "TETRIS", "PONG", "PIANO", "BREAKOUT", "FLAPPY", "DESKTOP PET", "PC MONITOR"};
     static_assert(std::size(names) == unsigned(View::count));
     return unsigned(v) < unsigned(View::count) ? names[unsigned(v)] : "";
 }
@@ -265,7 +266,9 @@ void Model::handle(KeyEvent event)
     if (direction)
     {
         const int d = (event.key == Key::up || event.key == Key::left) ? -1 : 1;
-        if (view_ == View::debug)
+        if (view_ == View::pc_monitor)
+            pc_monitor_page_ ^= 1;
+        else if (view_ == View::debug)
         {
             probe_speed_ = uint8_t((int(probe_speed_) + d + 5) % 5);
             effect(set_probe_clock);
@@ -337,6 +340,9 @@ void Model::confirm()
     }
     switch (view_)
     {
+        case View::pc_monitor:
+            pc_monitor_page_ ^= 1;
+            break;
         case View::clock:
         case View::network:
             effect(sync_time);
@@ -384,6 +390,7 @@ void Model::open(View next, bool forward)
         else game_.reset(GameId(unsigned(next) - unsigned(View::dino)), seed);
     }
     if (next == View::pet) pet_.select(pet_.style(), now_);
+    if (next == View::pc_monitor) pc_monitor_page_ = 0;
     forward_ = forward;
     motion_.carousel_x.snap(0);
     motion_.page_x.snap(int16_t(forward ? 128 : -128));

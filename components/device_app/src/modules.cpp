@@ -8,6 +8,7 @@
 #include "c3/network.hpp"
 #include "c3/oled.hpp"
 #include "c3/probe.hpp"
+#include "c3/pc_monitor_service.hpp"
 #include "c3/piano_audio.hpp"
 #include "driver/gpio.h"
 #include "esp_log.h"
@@ -199,6 +200,15 @@ class ProbeModule final : public AppModule
     bool on_initialize() override { return dap::initialize() == ESP_OK; }
     bool on_deinitialize() override { return dap::deinitialize(); }
 };
+class PcMonitorModule final : public AppModule
+{
+   public:
+    std::string_view name() const override { return "pc_monitor"; }
+
+   private:
+    bool on_initialize() override { return pc::initialize() == ESP_OK; }
+    bool on_deinitialize() override { return pc::deinitialize(); }
+};
 class InputTask final : public AppTask
 {
    public:
@@ -379,6 +389,7 @@ class UiTask final : public AppTask
             if (now - network_at >= 250)
             {
                 telemetry = network::snapshot();
+                telemetry.pc = pc::snapshot();
                 network_at = now;
             }
             telemetry.free_heap = esp_get_free_heap_size();
@@ -491,6 +502,7 @@ class UiModule final : public AppModule
 std::unique_ptr<AppModule> create_storage(Runtime& r) { return std::make_unique<StorageModule>(r); }
 std::unique_ptr<AppModule> create_network() { return std::make_unique<NetworkModule>(); }
 std::unique_ptr<AppModule> create_probe() { return std::make_unique<ProbeModule>(); }
+std::unique_ptr<AppModule> create_pc_monitor() { return std::make_unique<PcMonitorModule>(); }
 std::unique_ptr<AppModule> create_input(Runtime& r) { return std::make_unique<InputModule>(r); }
 std::unique_ptr<AppModule> create_ui(Runtime& r) { return std::make_unique<UiModule>(r); }
 }  // namespace c3::device

@@ -158,7 +158,7 @@ void exit_button_tests()
         View::home, View::home, View::home, View::home, View::home,
         View::tools, View::tools, View::tools, View::tools, View::tools,
         View::settings, View::home, View::games, View::games, View::games,
-        View::games, View::games, View::games, View::games, View::games, View::home};
+        View::games, View::games, View::games, View::games, View::games, View::home, View::tools};
     static_assert(parents.size() == unsigned(View::count));
     for (unsigned v = 0; v < parents.size(); ++v)
     {
@@ -205,7 +205,7 @@ void exit_button_tests()
 
     for (const auto view : {View::tools, View::network, View::clock, View::settings,
                             View::stopwatch, View::countdown, View::input_lab,
-                            View::system, View::debug, View::about, View::games})
+                            View::system, View::debug, View::about, View::games, View::pc_monitor})
     {
         Model model;
         model.tick(0);
@@ -264,6 +264,51 @@ void render_tests()
         assert(std::any_of(frame.begin(), frame.end(), [](auto b) { return b != 0; }));
     }
 }
+void pc_monitor_ui_tests()
+{
+    Model model;
+    model.tick(0);
+    model.tick(600);
+    model.open(View::pc_monitor);
+    for (uint32_t now = 605; now < 2000; now += 5) model.tick(now);
+    assert(!model.gaming() && model.pc_monitor_page() == 0);
+    Telemetry telemetry;
+    Frame frame;
+    render(frame, model, telemetry, 2000);
+    const auto waiting = frame;
+    telemetry.pc.listening = telemetry.pc.received = true;
+    telemetry.pc.stale = false;
+    auto& stats = telemetry.pc.stats;
+    stats.cpu_valid = stats.gpu_valid = stats.vram_valid = stats.gpu_temp_valid = true;
+    stats.cpu_pct = 23;
+    stats.gpu_pct = 91;
+    stats.ram_used = 8ULL << 30;
+    stats.ram_total = 32ULL << 30;
+    stats.vram_used = 4ULL << 30;
+    stats.vram_total = 12ULL << 30;
+    stats.gpu_temp_c = 55;
+    render(frame, model, telemetry, 2000);
+    const auto live = frame;
+    assert(live != waiting);
+    model.handle({Key::down, Gesture::pressed, 2001, 0});
+    assert(model.pc_monitor_page() == 1);
+    render(frame, model, telemetry, 2001);
+    assert(frame != live);
+    const auto details = frame;
+    stats.vram_valid = stats.gpu_temp_valid = false;
+    render(frame, model, telemetry, 2001);
+    assert(frame != details);
+    model.handle({Key::up, Gesture::pressed, 2002, 0});
+    telemetry.pc.stale = true;
+    render(frame, model, telemetry, 2002);
+    assert(frame != live);
+    model.handle({Key::enter, Gesture::pressed, 2003, 0});
+    assert(model.view() == View::pc_monitor && model.pc_monitor_page() == 1);
+    model.handle({Key::back, Gesture::pressed, 2004, 0});
+    assert(model.view() == View::tools);
+    model.open(View::pc_monitor);
+    assert(model.pc_monitor_page() == 0);
+}
 }  // namespace
 int main()
 {
@@ -272,6 +317,7 @@ int main()
     model_tests();
     exit_button_tests();
     render_tests();
+    pc_monitor_ui_tests();
     static_assert(board_gpio(4) && board_gpio(6) && board_gpio(7) && board_gpio(20));
     static_assert(!board_gpio(18) && !board_gpio(19) && !board_gpio(12));
     static_assert(!board_gpio(2) && !board_gpio(8) && !board_gpio(9));

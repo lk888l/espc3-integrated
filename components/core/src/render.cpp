@@ -111,6 +111,70 @@ void footer(Canvas& c, int x, std::string_view hint)
     c.line(x, 54, x + 127, 54);
     c.text(x + 4, 56, hint);
 }
+void pc_metric(Canvas& c, int x, int y, const char* label, float percent, bool valid)
+{
+    char value[12];
+    c.text(x + 4, y, label);
+    if (valid)
+        std::snprintf(value, sizeof(value), "%3.0f%%", double(percent));
+    else
+        std::snprintf(value, sizeof(value), " N/A");
+    c.text(x + 29, y, value);
+    c.rect(x + 59, y + 1, 65, 6);
+    if (valid)
+        c.rect(x + 60, y + 2, int(std::clamp(percent, 0.0F, 100.0F) * 63 / 100), 4, set, true);
+}
+void pc_monitor_view(Canvas& c, const Model& m, const Telemetry& t, int x)
+{
+    const auto& snapshot = t.pc;
+    const auto& stats = snapshot.stats;
+    char line[40];
+    header(c, x, m.pc_monitor_page() ? "PC MONITOR 2/2" : "PC MONITOR 1/2");
+    if (!t.wifi_enabled || !snapshot.received)
+    {
+        c.text(x + 4, 16, !t.wifi_enabled ? "WI-FI OFF" : "WAITING FOR PC");
+        std::snprintf(line, sizeof(line), "IP %s", t.station_connected ? t.sta_ip : t.ap_ip);
+        c.text(x + 4, 29, line);
+        c.text(x + 4, 42, !t.wifi_enabled ? "SETTINGS > WI-FI" : "WL1 STUDIO UDP4443");
+        footer(c, x, "<> PAGE BACK EXIT");
+        return;
+    }
+    const bool fresh = snapshot.listening && !snapshot.stale;
+    if (fresh)
+        std::snprintf(line, sizeof(line), "LIVE %.14s", stats.host);
+    else
+        std::snprintf(line, sizeof(line), "STALE / RECONNECT");
+    c.text(x + 4, 13, line);
+    if (!m.pc_monitor_page())
+    {
+        pc_metric(c, x, 24, "CPU", stats.cpu_pct, fresh && stats.cpu_valid);
+        const float ram = stats.ram_total ? float(double(stats.ram_used) / double(stats.ram_total) * 100) : 0;
+        pc_metric(c, x, 34, "RAM", ram, fresh && stats.ram_total != 0);
+        pc_metric(c, x, 44, "GPU", stats.gpu_pct, fresh && stats.gpu_valid);
+    }
+    else
+    {
+        constexpr double gib = 1024.0 * 1024 * 1024;
+        if (fresh && stats.ram_total)
+            std::snprintf(line, sizeof(line), "RAM %.1f/%.1fG", double(stats.ram_used) / gib,
+                          double(stats.ram_total) / gib);
+        else
+            std::snprintf(line, sizeof(line), "RAM N/A");
+        c.text(x + 4, 24, line);
+        if (fresh && stats.vram_valid)
+            std::snprintf(line, sizeof(line), "VRAM %.1f/%.1fG", double(stats.vram_used) / gib,
+                          double(stats.vram_total) / gib);
+        else
+            std::snprintf(line, sizeof(line), "VRAM N/A");
+        c.text(x + 4, 34, line);
+        if (fresh && stats.gpu_temp_valid)
+            std::snprintf(line, sizeof(line), "GPU TEMP %.0fC", double(stats.gpu_temp_c));
+        else
+            std::snprintf(line, sizeof(line), "GPU TEMP N/A");
+        c.text(x + 4, 44, line);
+    }
+    footer(c, x, "<> PAGE BACK EXIT");
+}
 void icon(Canvas& c, Icon icon, int x, int y)
 {
     switch (icon)
@@ -287,6 +351,11 @@ void view(Canvas& c, const Model& m, const Telemetry& t, View v, int x, uint32_t
     if (v == View::pet)
     {
         m.pet().draw(c, now, x);
+        return;
+    }
+    if (v == View::pc_monitor)
+    {
+        pc_monitor_view(c, m, t, x);
         return;
     }
     if (v >= View::dino && v <= View::flappy)

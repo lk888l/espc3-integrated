@@ -1,5 +1,36 @@
 # 验证记录
 
+## 2026-10-19：无线电脑监控与 wl1-studio 轻量核心
+
+ESP-IDF 5.5.4 / Docker `esp-dev` 构建和 `/dev/ttyACM0` 烧录成功，
+设备通过 STA `172.18.6.151` 接收 UDP 4443。原 STA 凭据、显示设置与 USB 桌宠功能保留。
+
+| 检查 | 结果 |
+| --- | --- |
+| ASan/UBSan 主机 CTest | 9 项全部通过，包含限长 JSON、Unicode、字段范围、空值、序号与时钟回绕、过期及新页面导航/渲染 |
+| pc_monitor_smoke.py 实板 | 8 组通过；完整/缺失数据、错误/超长/乱序包、ACK、3 秒断流、Wi-Fi 恢复、菜单/游戏并发、DAP 共存及持续收包健康 |
+| 真实 Rust 核心 → MCU | 20 秒共发送 40 份真实 CPU/RAM/NVIDIA 样本，20 次观测均 connected=true、无错误；最后序号、容量、GPU 和温度与串口快照一致 |
+| serial_smoke.py | 6 组通过；计时器、菜单、NVS 两次重启、Wi-Fi/DAP 生命周期，原显示设置恢复 |
+| exit_smoke.py | 13 组通过；包含新增 PC Monitor 的单级返回、全部游戏准备/进行/暂停、桌宠及 DAP 退出 |
+| wl1-studio 前端 | lint、类型检查、210 项测试、生产构建通过；桌面/窄屏浏览器布局无异常，桌面桥 fixture 检查启停与切页保持运行 |
+| wl1-studio Rust | 核心 7 项、应用 157 项通过；既有 13 项硬件测试默认忽略；全 workspace Clippy 严格检查通过 |
+| 完整桌面程序 | Tauri debug / no-bundle 构建通过，129 项动态依赖可解析，包含最终前端 |
+| OLED 布局 | 使用相同固件渲染器导出总览、详情、过期状态并查看；未以相机确认物理屏幕内容 |
+
+本机为 Linux，NVIDIA GeForce RTX 5070 Ti Laptop GPU。
+独立采集核心 10 秒短时测量：稳态约占单核 CPU 0.12%，最高驻留内存 24960 KiB（包含 NVML）；
+该结果取决于主机和显卡驱动，原始数据在 `core-profile.json`。
+真实样本测试时空闲堆 131408 B，接收任务栈最低余量 4108 B，UI 栈最低余量 3396 B；
+专项持续收包与 USB/Back 回归均无按键丢失或 SPI 错误。Windows 本轮没有实机运行验证。
+
+结果在 `build/hardware/pc-monitor/`：`pc-monitor-smoke.json`、`real-validation.json`、
+`real-samples.jsonl`、`real-device.json` 和 `regression/{serial,exit}-smoke.json`。
+固件 bin 为 977632 字节，SHA-256：
+
+```text
+4d350042a88b1272ac196245013e07209267d0ceeb365bfb16a4218cf7021caa
+```
+
 ## 2026-10-19：独立单击退出键，固件 1.2.0
 
 已读取 NAS 原始引脚图，与 `docs/hardware/pinout.png` 的 SHA-256 一致。

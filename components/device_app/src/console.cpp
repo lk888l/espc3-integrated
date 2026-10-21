@@ -7,6 +7,7 @@
 #include "c3/device_app.hpp"
 #include "c3/network.hpp"
 #include "c3/probe.hpp"
+#include "c3/pc_monitor_service.hpp"
 #include "driver/usb_serial_jtag.h"
 #include "driver/usb_serial_jtag_vfs.h"
 #include "esp_console.h"
@@ -27,6 +28,7 @@ int status_command(int, char**)
 {
     const auto net = network::snapshot();
     const auto probe = dap::snapshot();
+    const auto monitor = pc::snapshot();
     std::printf("heap=%lu min=%lu wifi=%u sta=%s time=%s synced=%u\n",
                 (unsigned long)esp_get_free_heap_size(),
                 (unsigned long)esp_get_minimum_free_heap_size(), net.wifi_enabled, net.sta_ip,
@@ -66,6 +68,22 @@ int status_command(int, char**)
         (unsigned long)probe.errors, probe.last_ack, (unsigned long)probe.requested_hz,
         (unsigned long)probe.configured_hz, (unsigned long)probe.limit_hz,
         esp_err_to_name(probe.error));
+    std::printf("pc_listening=%u pc_received=%u pc_stale=%u pc_age_ms=%lu pc_seq=%lu "
+                "pc_accepted=%lu pc_rejected=%lu pc_out_of_order=%lu "
+                "pc_cpu_valid=%u pc_cpu_pct=%.1f pc_gpu_valid=%u pc_gpu_pct=%.1f "
+                "pc_ram_used=%llu pc_ram_total=%llu pc_vram_valid=%u "
+                "pc_vram_used=%llu pc_vram_total=%llu pc_temp_valid=%u pc_temp_c=%.1f "
+                "pc_error=%d pc_stack_free=%lu pc_session=%s\n",
+                monitor.listening, monitor.received, monitor.stale, (unsigned long)monitor.age_ms,
+                (unsigned long)monitor.stats.seq, (unsigned long)monitor.accepted,
+                (unsigned long)monitor.rejected, (unsigned long)monitor.out_of_order,
+                monitor.stats.cpu_valid, double(monitor.stats.cpu_pct), monitor.stats.gpu_valid,
+                double(monitor.stats.gpu_pct), (unsigned long long)monitor.stats.ram_used,
+                (unsigned long long)monitor.stats.ram_total, monitor.stats.vram_valid,
+                (unsigned long long)monitor.stats.vram_used, (unsigned long long)monitor.stats.vram_total,
+                monitor.stats.gpu_temp_valid, double(monitor.stats.gpu_temp_c), monitor.error,
+                (unsigned long)monitor.stack_free,
+                monitor.received ? monitor.stats.session : "none");
     return 0;
 }
 int wifi_command(int argc, char** argv)

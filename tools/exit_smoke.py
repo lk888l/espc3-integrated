@@ -57,9 +57,9 @@ def exercise(device, passed):
     pages = ((1, None, 0, TOOLS, HOME), (2, None, 0, 2, HOME),
              (3, None, 0, 3, HOME), (4, None, 0, SETTINGS, HOME),
              (0, None, 0, GAMES, HOME),
-             (1, 0, 6, 5, TOOLS), (1, 1, 6, 6, TOOLS),
-             (1, 2, 6, 7, TOOLS), (1, 3, 6, 8, TOOLS),
-             (1, 4, 6, 9, TOOLS), (1, 5, 6, 10, TOOLS),
+             (1, 0, 7, 5, TOOLS), (1, 1, 7, 6, TOOLS),
+             (1, 2, 7, 7, TOOLS), (1, 3, 7, 8, TOOLS),
+             (1, 4, 7, 9, TOOLS), (1, 5, 7, 21, TOOLS), (1, 6, 7, 10, TOOLS),
              (4, 4, 5, 10, SETTINGS))
     for card, row, size, view, parent in pages:
         open_page(card, row, size)

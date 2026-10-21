@@ -57,6 +57,28 @@ int main(int argc, char** argv)
         render(frame, model, t, now);
         save(frame, root / (std::to_string(unsigned(view)) + ".pgm"));
     }
+    t.pc.listening = t.pc.received = true;
+    t.pc.stale = false;
+    std::strcpy(t.pc.stats.host, "MY-PC");
+    t.pc.stats.cpu_valid = t.pc.stats.gpu_valid = t.pc.stats.vram_valid =
+        t.pc.stats.gpu_temp_valid = true;
+    t.pc.stats.cpu_pct = 23.5;
+    t.pc.stats.gpu_pct = 81;
+    t.pc.stats.ram_used = 8ULL << 30;
+    t.pc.stats.ram_total = 32ULL << 30;
+    t.pc.stats.vram_used = 4ULL << 30;
+    t.pc.stats.vram_total = 12ULL << 30;
+    t.pc.stats.gpu_temp_c = 55;
+    model.open(View::pc_monitor);
+    settle();
+    render(frame, model, t, now);
+    save(frame, root / "pc-monitor.pgm");
+    model.handle({Key::down, Gesture::pressed, ++now, 0});
+    render(frame, model, t, now);
+    save(frame, root / "pc-monitor-details.pgm");
+    t.pc.stale = true;
+    render(frame, model, t, now);
+    save(frame, root / "pc-monitor-stale.pgm");
     for (unsigned game = 0; game < 8; ++game)
     {
         model.open(View(unsigned(View::dino) + game));

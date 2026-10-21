@@ -158,7 +158,7 @@ def main():
         device.open_home_card(1)
         tools = device.status()
         assert tools["ui"] == 1, tools
-        for _ in range((1 - tools["selected"]) % 6):
+        for _ in range((1 - tools["selected"]) % 7):
             device.key("down")
         device.key("enter")
         assert device.status()["ui"] == 6

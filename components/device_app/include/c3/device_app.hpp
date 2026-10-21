@@ -63,6 +63,7 @@ struct Runtime
 std::unique_ptr<AppModule> create_storage(Runtime& runtime);
 std::unique_ptr<AppModule> create_network();
 std::unique_ptr<AppModule> create_probe();
+std::unique_ptr<AppModule> create_pc_monitor();
 std::unique_ptr<AppModule> create_input(Runtime& runtime);
 std::unique_ptr<AppModule> create_ui(Runtime& runtime);
 std::unique_ptr<AppModule> create_console(Runtime& runtime);

@@ -13,6 +13,8 @@ ESP32-C3 Super Mini / ESP-IDF 5.5.4 / C++20。SSD1306 **128×64 四线 SPI**，
   长按、重复、单击、双击、独立退出键和队列统计；
 - Stopwatch、Countdown、Input Lab、System、Wi-Fi DAP、About；
 - Wi-Fi AP+STA、退避重连、USB 命令配置、SNTP 自动和手动校时；
+- 无线电脑监控：wl1-studio 采集 Windows / Linux 的 CPU、RAM 与 NVIDIA GPU / 显存 / 温度，
+  UDP 推送到 Tools → PC Monitor，支持数据过期提示和断网恢复；
 - Motion / Brightness / Home Header 设置，NVS 保存并合并 750 ms 内的修改；
 - Wi-Fi CMSIS-DAP / SWD：OpenOCD TCP 4441、UDP 4442 发现、单客户端、
   协议边界检查、传输取消、断线及退出后恢复引脚高阻。
@@ -176,6 +178,15 @@ SNTP 服务器 ntp.aliyun.com / pool.ntp.org，周期一小时。
 未获得有效时间时显示 --:--:--。完全断电后需要联网重新校时；
 本工程没有配置电池 RTC。NVS 未启用加密，凭据保存在设备 Flash；
 不要提交含密码的 sdkconfig。
+
+## 无线电脑监控
+
+在 wl1-studio 的 **ESP-C3 桌宠 → 电脑监控** 填写设备 STA 地址并开始监控，
+MCU 打开 **Tools → PC Monitor**；Up / Down / Enter 切换总览与详情，Back 返回。
+电脑与设备处于同一网络即可，无需 USB 数据连接。默认 500 ms 更新，
+超过 3 秒未更新显示过期；切换电脑端页面或最小化继续运行，退出应用停止。
+
+完整使用步骤、UDP 协议和实板验证见 [无线电脑监控](docs/pc-monitor.md)。
 
 ## 无线 SWD
 

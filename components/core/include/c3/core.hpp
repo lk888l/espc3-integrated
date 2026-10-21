@@ -8,6 +8,7 @@
 #include "c3/games.hpp"
 #include "c3/bonus_games.hpp"
 #include "c3/pet.hpp"
+#include "c3/pc_monitor.hpp"
 
 namespace c3
 {
@@ -145,6 +146,7 @@ enum class View : uint8_t
     breakout,
     flappy,
     pet,
+    pc_monitor,
     count
 };
 enum class Icon : uint8_t
@@ -216,6 +218,7 @@ class Model
         return std::array<uint32_t, 5>{100000, 250000, 500000, 1000000, 2000000}[probe_speed_];
     }
     bool probe_wanted() const { return probe_wanted_; }
+    uint8_t pc_monitor_page() const { return pc_monitor_page_; }
     void probe_stopped() { probe_wanted_ = false; }
     void reset_stopwatch();
     bool gaming() const { return view_ >= View::dino && view_ <= View::flappy; }
@@ -244,6 +247,7 @@ class Model
     View view_ = View::home, previous_view_ = View::home, about_parent_ = View::settings;
     std::array<uint8_t, unsigned(View::count)> selection_{};
     uint8_t previous_card_ = 0, probe_speed_ = 0;
+    uint8_t pc_monitor_page_ = 0;
     int carousel_direction_ = 1;
     bool forward_ = true, booting_ = true, have_tick_ = false, probe_wanted_ = false;
     uint16_t effects_ = 0;
@@ -258,6 +262,7 @@ class Model
 
 struct Telemetry
 {
+    pc::Snapshot pc{};
     char time[9] = "--:--:--", date[11] = "----/--/--";
     char sta_ip[16] = "0.0.0.0", ap_ip[16] = "192.168.4.1", ap_ssid[33]{}, ap_password[64]{};
     bool time_valid{}, time_synced{}, wifi_enabled = true, station_connected{};
