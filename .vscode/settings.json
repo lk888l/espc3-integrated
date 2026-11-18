@@ -1,5 +1,12 @@
 {
     "idf.currentSetup": "/opt/esp-idf",
-    "idf.flashType": "UART",
-    "idf.port": "/dev/ttyACM0"
+    "idf.flashType": "JTAG",
+    "idf.port": "/dev/ttyACM0",
+    "idf.openOcdConfigs": [
+        "board/esp32c3-builtin.cfg"
+    ],
+    "idf.customExtraVars": {
+        "OPENOCD_USB_ADAPTER_LOCATION": "3-1",
+        "IDF_TARGET": "esp32c3"
+    }
 }

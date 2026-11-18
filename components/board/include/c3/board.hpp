@@ -13,8 +13,10 @@ inline constexpr std::array<int, 8> keys = {
     CONFIG_C3_KEY_UP,   CONFIG_C3_KEY_DOWN,     CONFIG_C3_KEY_LEFT,  CONFIG_C3_KEY_RIGHT,
     CONFIG_C3_KEY_JUMP, CONFIG_C3_KEY_FUNCTION, CONFIG_C3_KEY_ENTER, CONFIG_C3_KEY_BACK};
 inline constexpr std::array<int, 17> pins = {
-    CONFIG_C3_OLED_SCLK,    CONFIG_C3_OLED_MOSI, CONFIG_C3_OLED_CS,   CONFIG_C3_OLED_DC,
-    CONFIG_C3_OLED_RESET,   CONFIG_C3_SWD_CLK,   CONFIG_C3_SWD_IO,    CONFIG_C3_KEY_UP,
+    CONFIG_C3_OLED_SCLK,    CONFIG_C3_OLED_MOSI, CONFIG_C3_OLED_DC,   CONFIG_C3_OLED_RESET,
+    CONFIG_C3_SWD_CLK,      CONFIG_C3_SWD_IO,
+    // Optional GPIOs (-1 = unused).
+    CONFIG_C3_OLED_CS,      CONFIG_C3_KEY_UP,
     CONFIG_C3_KEY_DOWN,     CONFIG_C3_KEY_LEFT,  CONFIG_C3_KEY_RIGHT, CONFIG_C3_KEY_JUMP,
     CONFIG_C3_KEY_FUNCTION, CONFIG_C3_KEY_ENTER, CONFIG_C3_KEY_BACK,  CONFIG_C3_SWD_RESET,
     CONFIG_C3_BUZZER_GPIO};
@@ -27,7 +29,7 @@ constexpr bool valid_plan()
 {
     for (unsigned i = 0; i < pins.size(); ++i)
     {
-        if (pins[i] == -1 && i >= 7) continue;
+        if (pins[i] == -1 && i >= 6) continue;
         // Only the active-low Back input gets a GPIO2 exception. The uniqueness
         // check below still rejects any other function sharing that pin.
         if (pins[i] == 2 && CONFIG_C3_KEY_BACK == 2) continue;

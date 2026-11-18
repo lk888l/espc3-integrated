@@ -9,9 +9,12 @@ menu "C3 GameBox"
             range 0 21
             default 6
         config C3_OLED_CS
-            int "OLED CS GPIO"
-            range 0 21
-            default 7
+            int "OLED CS GPIO (-1 = CS wired to GND)"
+            range -1 21
+            default -1
+            help
+                With CS wired to GND the OLED is always selected and uses
+                the SPI bus exclusively. Set a GPIO if CS is wired to it.
         config C3_OLED_DC
             int "OLED D/C GPIO"
             range 0 21

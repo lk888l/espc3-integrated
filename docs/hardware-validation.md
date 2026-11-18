@@ -7,7 +7,7 @@ NVS、Wi-Fi STA、自动/手动校时及无线 DAP 协议。见[验证记录](va
 
 ## OLED
 
-1. 核对 3V3/GND、4/6/7 时钟/数据/CS 和 10/5 DC/RES，模块为四线 SPI。
+1. 核对 3V3/GND 供电，SCLK 接 GPIO4、MOSI 接 GPIO6、DC 接 GPIO10、RES 接 GPIO5，CS# 直接接 GND。模块设为四线 SPI。
 2. 检查开机、六张主页卡片、列表、Clock/Network 显示。
 3. 动画中快速导航、Enter 确认应有效。
 4. 比较 Full/Reduced/Off 与 STM-GameBox 的回弹、滑入、光标形态。

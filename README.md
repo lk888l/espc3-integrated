@@ -67,9 +67,7 @@ Tetris 在松开 Enter 并确认单击后旋转（双击判定窗口 150 ms）�
 
 Piano 默认仅显示八个琴键和弹奏反馈。声音需要外接**无源蜂鸣器**，在
 menuconfig → C3 GameBox → Board wiring 中设置 `C3_BUZZER_GPIO`，默认 -1 禁用。
-引脚必须空闲并通过现有冲突检查；默认接线已使用全部非启动配置 GPIO，
-GPIO2 已分配给退出键，需调整接线或按实际启动电平允许空闲 GPIO8/9。蜂鸣器驱动使用 LEDC PWM，
-单音 180 ms，暂停和退出立即静音。
+默认接线下 GPIO7 空闲，可用于蜂鸣器。蜂鸣器驱动使用 LEDC PWM，单音 180 ms，暂停和退出立即静音。
 
 ## 菜单预览
 
@@ -83,13 +81,14 @@ GPIO2 已分配给退出键，需调整接线或按实际启动电平允许空�
 
 已核对用户提供的 [Super Mini 引脚图](docs/hardware/pinout.png)。
 图上标记 GPIO4=SCK、GPIO6=MOSI、GPIO7=SS、GPIO5=MISO。
-屏幕无需 MISO，因此 GPIO5 改作 OLED RES。
+屏幕无需 MISO，因此 GPIO5 改作 OLED RES。CS# 直接接 GND，GPIO7 可另作他用。
+沿用旧 `sdkconfig` 时，将 `CONFIG_C3_OLED_CS` 从 `7` 改为 `-1` 即可使用此接线。
 
 | 功能 | GPIO | 连接 |
 | --- | ---: | --- |
 | OLED SCLK / D0 / SCL | 4 | 屏幕 SPI 时钟 |
 | OLED MOSI / D1 / SDA | 6 | 屏幕 SPI 数据 |
-| OLED CS | 7 | 屏幕 CS# |
+| OLED CS# | — | 直接接 GND，屏幕常选中 |
 | OLED DC | 10 | 屏幕 D/C# |
 | OLED RES | 5 | 屏幕 RES# |
 | OLED VCC / GND | — | 3V3 / GND |
@@ -102,7 +101,7 @@ GPIO2 已分配给退出键，需调整接线或按实际启动电平允许空�
 | 外部目标 GND | — | 两板共地 |
 | 外部目标 NRST | 默认禁用 | 可配置，不能与已有功能冲突 |
 
-屏幕仅使用 SPI2_HOST，Mode 0、8 MHz、DMA；Flash 的 SPI 留给系统。
+CS# 接地时，屏幕独占 SPI2_HOST（Mode 0、8 MHz、DMA）。Flash 的 SPI 留给系统。
 GPIO2 原先空闲，现作为低电平有效的独立退出键。固件运行时启用内部上拉，
 建议外接 10 kΩ 电阻从 GPIO2 上拉至 3V3，保证复位期间的电平；上电和复位时松开退出键。
 GPIO2 是启动配置脚；[乐鑫数据手册 §3.1](https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf)
