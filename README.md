@@ -13,6 +13,7 @@ ESP32-C3 Super Mini / ESP-IDF 5.5.4 / C++20。SSD1306 **128×64 四线 SPI**，
   长按、重复、单击、双击、独立退出键和队列统计；
 - Stopwatch、Countdown、Input Lab、System、Wi-Fi DAP、About；
 - Wi-Fi AP+STA、退避重连、USB 命令配置、SNTP 自动和手动校时；
+- 本地网页与 HTTP v1 控制接口，支持配对后切换桌宠造型、触发动作、预览 OLED、调整显示和试连 Wi-Fi。
 - 无线电脑监控：wl1-studio 采集 Windows / Linux 的 CPU、RAM 与 NVIDIA GPU / 显存 / 温度，
   UDP 推送到 Tools → PC Monitor，支持数据过期提示和断网恢复；
 - Motion / Brightness / Home Header 设置，NVS 保存并合并 750 ms 内的修改；
@@ -158,6 +159,13 @@ build/idf/partition_table/partition-table.bin
 
 ## 联网和校时
 
+电脑或手机与设备连同一局域网，在浏览器打开 Network 页面上的 STA 地址。
+也可以直连屏上显示的设备热点，打开 **http://192.168.4.1/**。
+在 **Network** 按 **Up** 取得六位配对码，输入网页后点选“像素猫”和“跳舞”，
+即可在设备和网页看到同一个桌宠。网页也能调整亮度、菜单动画、主页标题和 Wi-Fi。
+在可信局域网内，桌面程序、手机 App 和微信小程序可以使用相同接口。
+仓库提供 Python 客户端和可导入的微信小程序示例。见[连接与客户端协议](docs/local-control.md)。
+
 默认开启热点 C3GB-xxxxxx。密码首次自动生成并保存到 NVS，
 在 Network 页面或 USB 控制台的 wifi 命令中查看。
 CONFIG_C3_AP_PASSWORD 可覆盖自动密码。
@@ -167,6 +175,8 @@ USB 控制台（含空格的 SSID/密码使用双引号）：
 ~~~text
 help
 wifi
+wifi pair
+wifi revoke
 wifi set "你的SSID" "你的密码"
 status
 ntp

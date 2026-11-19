@@ -1,0 +1,4 @@
+{
+  "pages": ["pages/pet/pet"],
+  "window": { "navigationBarTitleText": "GameBox 桌宠" }
+}

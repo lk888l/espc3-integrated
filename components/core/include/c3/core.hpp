@@ -198,7 +198,9 @@ enum Effect : uint16_t
     toggle_wifi = 4,
     start_probe = 8,
     stop_probe = 16,
-    set_probe_clock = 32
+    set_probe_clock = 32,
+    pair_client = 64,
+    revoke_clients = 128
 };
 class Model
 {
@@ -220,6 +222,7 @@ class Model
     uint8_t selected(View v) const { return selection_[unsigned(v)]; }
     const MenuMotion& motion() const { return motion_; }
     const Settings& settings() const { return settings_; }
+    void set_settings(Settings next);
     KeyEvent last_event() const { return last_event_; }
     uint32_t event_count() const { return event_count_; }
     uint32_t stopwatch_ms() const;
@@ -272,12 +275,15 @@ class Model
     uint32_t game_steps_ = 0, game_serial_ = 0;
 };
 
+enum class ProvisionState : uint8_t { idle, trying, saved, failed, storage_error };
 struct Telemetry
 {
     pc::Snapshot pc{};
     char time[9] = "--:--:--", date[11] = "----/--/--";
     char sta_ip[16] = "0.0.0.0", ap_ip[16] = "192.168.4.1", ap_ssid[33]{}, ap_password[64]{};
-    bool time_valid{}, time_synced{}, wifi_enabled = true, station_connected{};
+    bool time_valid{}, time_synced{}, wifi_enabled = true, station_connected{}, station_configured{};
+    ProvisionState provisioning = ProvisionState::idle;
+    uint32_t pairing_code = 0;
     int rssi = 0;
     uint32_t sync_age_s{}, free_heap{}, min_heap{}, key_events{}, key_drops{}, input_late{};
     uint32_t frames{}, skipped_frames{}, display_errors{}, frame_us{};

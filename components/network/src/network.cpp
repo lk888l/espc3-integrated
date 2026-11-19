@@ -1,4 +1,5 @@
 #include "c3/network.hpp"
+#include "c3/pairing.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -29,12 +30,16 @@ Telemetry state;
 std::atomic<bool> want_enabled{true}, connected{false}, associated{false}, associating{false},
     got_ip{false}, lost_ip{false}, want_sync{false};
 std::atomic<int64_t> synchronized_at{-1};
+std::atomic<uint32_t> association_epoch{0}, dhcp_epoch{0};
 struct Credentials
 {
     uint8_t version = 1;
     char ssid[33]{}, password[64]{};
 };
 Credentials credentials;
+enum class ConfigMode { save, trial, reconnect };
+struct ConfigCommand { Credentials next; ConfigMode mode; int64_t apply_after; };
+std::atomic<bool> config_busy{false};
 QueueHandle_t commands_queue = nullptr;
 esp_netif_t* sta = nullptr;
 esp_netif_t* ap = nullptr;
@@ -57,6 +62,7 @@ void event(void*, esp_event_base_t base, int32_t id, void* data)
 {
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_CONNECTED)
     {
+        ++association_epoch;
         associated = true;
         associating = false;
     }
@@ -85,6 +91,7 @@ void event(void*, esp_event_base_t base, int32_t id, void* data)
         connected = true;
         associated = true;
         associating = false;
+        dhcp_epoch = association_epoch.load();
         got_ip = true;
         update(
             [&](Telemetry& s)
@@ -101,18 +108,15 @@ bool valid_credentials(const char* ssid, const char* password)
     return ssid_size > 0 && ssid_size <= 32 &&
            (password_size == 0 || (password_size >= 8 && password_size <= 63));
 }
-void save_credentials()
+esp_err_t save_credentials(const Credentials& value)
 {
     nvs_handle_t handle;
-    if (nvs_open("network", NVS_READWRITE, &handle) != ESP_OK)
-    {
-        ESP_LOGE(tag, "cannot open credential store");
-        return;
-    }
-    auto result = nvs_set_blob(handle, "credentials", &credentials, sizeof(credentials));
+    auto result = nvs_open("network", NVS_READWRITE, &handle);
+    if (result != ESP_OK) return result;
+    result = nvs_set_blob(handle, "credentials", &value, sizeof(value));
     if (result == ESP_OK) result = nvs_commit(handle);
     nvs_close(handle);
-    if (result != ESP_OK) ESP_LOGE(tag, "credential save failed: %s", esp_err_to_name(result));
+    return result;
 }
 esp_err_t configure_station()
 {
@@ -133,6 +137,71 @@ class Worker final : public AppTask
     int64_t retry_at = 0, association_until = 0, dhcp_until = 0;
     uint32_t retry_ms = 1000;
     int64_t rssi_at = 0;
+    Credentials previous{};
+    int64_t trial_until = 0;
+    uint32_t prior_association = 0;
+    bool config_dirty = false;
+    esp_err_t reconfigure()
+    {
+        if (enabled) esp_wifi_disconnect();
+        connected = associated = associating = false;
+        got_ip = lost_ip = false;
+        association_until = dhcp_until = 0;
+        retry_ms = 1000;
+        retry_at = esp_timer_get_time() + 200000;
+        update([](Telemetry& s) {
+            s.station_connected = false;
+            s.rssi = 0;
+            std::strcpy(s.sta_ip, "0.0.0.0");
+        });
+        const auto result = enabled ? configure_station() : ESP_OK;
+        config_dirty = result != ESP_OK;
+        return result;
+    }
+    void finish_trial(ProvisionState result)
+    {
+        if (result != ProvisionState::saved)
+        {
+            credentials = previous;
+            const auto err = reconfigure();
+            if (err != ESP_OK) ESP_LOGE(tag, "restore station: %s", esp_err_to_name(err));
+        }
+        previous = {};
+        trial_until = 0;
+        update([&](Telemetry& s) {
+            s.provisioning = result;
+            s.station_configured = credentials.ssid[0] != 0;
+        });
+        config_busy = false;
+    }
+    void apply(const ConfigCommand& cmd)
+    {
+        if (cmd.mode == ConfigMode::save)
+        {
+            // Explicit USB setup may be performed offline. Keep the working link
+            // and its configuration if the replacement cannot be made durable.
+            const auto stored = save_credentials(cmd.next);
+            if (stored == ESP_OK)
+            {
+                credentials = cmd.next;
+                const auto err = reconfigure();
+                if (err != ESP_OK) ESP_LOGE(tag, "station config: %s", esp_err_to_name(err));
+            }
+            else ESP_LOGE(tag, "credential save: %s", esp_err_to_name(stored));
+            update([&](Telemetry& s) {
+                s.provisioning = stored == ESP_OK ? ProvisionState::idle : ProvisionState::storage_error;
+                s.station_configured = credentials.ssid[0] != 0;
+            });
+            config_busy = false;
+            return;
+        }
+        previous = credentials;
+        prior_association = association_epoch.load();
+        trial_until = esp_timer_get_time() + 45000000;
+        if (cmd.mode != ConfigMode::reconnect) credentials = cmd.next;
+        const auto configured = reconfigure();
+        if (configured != ESP_OK || !enabled) finish_trial(ProvisionState::failed);
+    }
     void start_radio()
     {
         esp_err_t result = configure_station();
@@ -140,6 +209,7 @@ class Worker final : public AppTask
         if (result == ESP_OK)
         {
             enabled = true;
+            config_dirty = false;
             retry_at = esp_timer_get_time() + 200000;
             retry_ms = 1000;
             association_until = dhcp_until = rssi_at = 0;
@@ -159,6 +229,8 @@ class Worker final : public AppTask
         const auto result = esp_wifi_stop();
         if (result != ESP_OK) ESP_LOGW(tag, "Wi-Fi stop: %s", esp_err_to_name(result));
         enabled = false;
+        if (trial_until) finish_trial(ProvisionState::failed);
+        pairing::revoke_all();
         connected = associated = associating = false;
         retry_at = association_until = dhcp_until = 0;
         update(
@@ -180,34 +252,24 @@ class Worker final : public AppTask
                 else
                     stop_radio();
             }
-            Credentials next;
-            if (xQueueReceive(commands_queue, &next, 0) == pdTRUE)
-            {
-                credentials = next;
-                save_credentials();
-                connected = associated = associating = false;
-                association_until = dhcp_until = 0;
-                update(
-                    [](Telemetry& s)
-                    {
-                        s.station_connected = false;
-                        std::strcpy(s.sta_ip, "0.0.0.0");
-                    });
-                if (enabled)
-                {
-                    esp_wifi_disconnect();
-                    const auto result = configure_station();
-                    retry_at = esp_timer_get_time() + 200000;
-                    retry_ms = 1000;
-                    if (result != ESP_OK)
-                        ESP_LOGE(tag, "station config failed: %s", esp_err_to_name(result));
-                }
-            }
+            ConfigCommand next;
+            if (xQueuePeek(commands_queue, &next, 0) == pdTRUE &&
+                (!enabled || esp_timer_get_time() >= next.apply_after) &&
+                xQueueReceive(commands_queue, &next, 0) == pdTRUE)
+                apply(next);
             if (got_ip.exchange(false) && connected)
             {
                 retry_at = 0;
                 retry_ms = 1000;
                 want_sync = true;
+                if (trial_until && dhcp_epoch.load() != prior_association)
+                {
+                    wifi_ap_record_t actual{};
+                    if (esp_wifi_sta_get_ap_info(&actual) == ESP_OK &&
+                        std::strncmp(reinterpret_cast<const char*>(actual.ssid), credentials.ssid, 32) == 0)
+                        finish_trial(save_credentials(credentials) == ESP_OK ? ProvisionState::saved
+                                                                            : ProvisionState::storage_error);
+                }
             }
             if (lost_ip.exchange(false) && !connected)
             {
@@ -215,6 +277,7 @@ class Worker final : public AppTask
                 retry_ms = std::min<uint32_t>(retry_ms * 2, 60000);
             }
             const int64_t now = esp_timer_get_time();
+            if (trial_until && now >= trial_until) finish_trial(ProvisionState::failed);
             if (associated && !connected && !dhcp_until) dhcp_until = now + 30000000;
             if (!associated || connected) dhcp_until = 0;
             if (connected) association_until = 0;
@@ -232,7 +295,9 @@ class Worker final : public AppTask
             {
                 // Set before calling the driver: an event may preempt this task.
                 associating = true;
-                const auto result = esp_wifi_connect();
+                auto result = config_dirty ? configure_station() : ESP_OK;
+                config_dirty = result != ESP_OK;
+                if (!config_dirty) result = esp_wifi_connect();
                 retry_at = now + int64_t(retry_ms) * 1000;
                 if (result == ESP_OK)
                     association_until = now + 15000000;
@@ -287,6 +352,7 @@ esp_err_t initialize()
     if ((result = esp_read_mac(mac, ESP_MAC_WIFI_STA)) != ESP_OK) return result;
     char ssid[33], password[64]{};
     std::snprintf(ssid, sizeof(ssid), "C3GB-%02X%02X%02X", mac[3], mac[4], mac[5]);
+    if ((result = esp_netif_set_hostname(sta, ssid)) != ESP_OK) return result;
     if (CONFIG_C3_AP_PASSWORD[0])
     {
         if (std::strlen(CONFIG_C3_AP_PASSWORD) < 8 || std::strlen(CONFIG_C3_AP_PASSWORD) > 63)
@@ -327,7 +393,7 @@ esp_err_t initialize()
     ap_config.ap.ssid_len = std::strlen(ssid);
     std::memcpy(ap_config.ap.password, password, std::strlen(password));
     ap_config.ap.authmode = WIFI_AUTH_WPA2_PSK;
-    ap_config.ap.max_connection = 2;
+    ap_config.ap.max_connection = 4;
     ap_config.ap.channel = 1;
     if ((result = esp_wifi_set_config(WIFI_IF_AP, &ap_config)) != ESP_OK) return result;
     credentials = {};
@@ -349,6 +415,7 @@ esp_err_t initialize()
         std::strcpy(credentials.ssid, CONFIG_C3_WIFI_SSID);
         std::strcpy(credentials.password, CONFIG_C3_WIFI_PASSWORD);
     }
+    update([](Telemetry& s) { s.station_configured = credentials.ssid[0] != 0; });
     if ((result = esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, event, nullptr,
                                                       &wifi_handler)) != ESP_OK)
         return result;
@@ -365,7 +432,7 @@ esp_err_t initialize()
     sntp.sync_cb = time_received;
     if ((result = esp_netif_sntp_init(&sntp)) != ESP_OK) return result;
     sntp_initialized = true;
-    commands_queue = xQueueCreate(1, sizeof(Credentials));
+    commands_queue = xQueueCreate(1, sizeof(ConfigCommand));
     if (!commands_queue) return ESP_ERR_NO_MEM;
     want_enabled = true;
     synchronized_at = -1;
@@ -373,6 +440,7 @@ esp_err_t initialize()
     want_sync = false;
     got_ip = false;
     lost_ip = false;
+    config_busy = false;
     if (!worker.start()) return ESP_ERR_NO_MEM;
     initialized = true;
     ESP_LOGI(tag, "AP SSID: %s; password is shown on the Network page", ssid);
@@ -426,13 +494,48 @@ bool deinitialize()
 }
 void set_enabled(bool enabled) { want_enabled = enabled; }
 bool enabled_requested() { return want_enabled.load(); }
+bool radio_running()
+{
+    portENTER_CRITICAL(&state_lock);
+    const auto enabled = state.wifi_enabled;
+    portEXIT_CRITICAL(&state_lock);
+    return enabled;
+}
+static SubmitResult submit(const char* ssid, const char* password, ConfigMode mode)
+{
+    const bool reuse = mode == ConfigMode::reconnect;
+    const bool trial = mode != ConfigMode::save;
+    if (!reuse && !valid_credentials(ssid, password)) return SubmitResult::invalid;
+    if (!commands_queue || config_busy.exchange(true)) return SubmitResult::busy;
+    if (reuse && !snapshot().station_configured)
+    {
+        config_busy = false;
+        return SubmitResult::unconfigured;
+    }
+    // Give the paired client time to receive its 202 on the current STA link.
+    ConfigCommand cmd{{}, mode, esp_timer_get_time() + (trial ? 500000 : 0)};
+    if (!reuse)
+    {
+        std::strcpy(cmd.next.ssid, ssid);
+        std::strcpy(cmd.next.password, password);
+    }
+    if (trial) update([](Telemetry& s) { s.provisioning = ProvisionState::trying; });
+    if (xQueueSend(commands_queue, &cmd, 0) == pdTRUE) return SubmitResult::queued;
+    if (trial) update([](Telemetry& s) { s.provisioning = ProvisionState::failed; });
+    config_busy = false;
+    return SubmitResult::busy;
+}
 bool set_credentials(const char* ssid, const char* password)
 {
-    if (!commands_queue || !valid_credentials(ssid, password)) return false;
-    Credentials next;
-    std::strcpy(next.ssid, ssid);
-    std::strcpy(next.password, password);
-    return xQueueOverwrite(commands_queue, &next) == pdTRUE;
+    return submit(ssid, password, ConfigMode::save) == SubmitResult::queued;
+}
+SubmitResult try_credentials(const char* ssid, const char* password)
+{
+    return submit(ssid, password, ConfigMode::trial);
+}
+SubmitResult reconnect()
+{
+    return submit(nullptr, nullptr, ConfigMode::reconnect);
 }
 void sync_time() { want_sync = true; }
 Telemetry snapshot()

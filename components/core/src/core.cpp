@@ -199,6 +199,13 @@ std::string_view title(View v)
     return unsigned(v) < unsigned(View::count) ? names[unsigned(v)] : "";
 }
 Model::Model(Settings settings) : settings_(settings.valid() ? settings : Settings{}) {}
+void Model::set_settings(Settings next)
+{
+    if (!next.valid() || (next.motion == settings_.motion && next.brightness == settings_.brightness &&
+                          next.header == settings_.header)) return;
+    settings_ = next;
+    effect(save_settings);
+}
 void Model::tick(uint32_t now)
 {
     now_ = now;
@@ -283,7 +290,12 @@ void Model::handle(KeyEvent event)
     if (direction)
     {
         const int d = (event.key == Key::up || event.key == Key::left) ? -1 : 1;
-        if (view_ == View::pc_monitor)
+        if (view_ == View::network)
+        {
+            if (event.gesture == Gesture::pressed && event.key == Key::up) effect(pair_client);
+            if (event.gesture == Gesture::pressed && event.key == Key::down) effect(revoke_clients);
+        }
+        else if (view_ == View::pc_monitor)
             pc_monitor_page_ ^= 1;
         else if (view_ == View::debug)
         {

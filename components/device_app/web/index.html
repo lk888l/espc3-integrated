@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#152921">
+<link rel="icon" href="data:,">
+<title>C3 GameBox · 桌宠控制台</title>
+<style>
+:root{color-scheme:light;--ink:#152921;--muted:#50625a;--paper:#f4f5ee;--line:#cdd4c8;--accent:#d5ef8e}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 "DM Sans",system-ui,sans-serif}
+header,main{width:min(920px,calc(100% - 36px));margin:auto}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:22px 0;border-bottom:1px solid var(--line)}
+header strong{font-size:21px;letter-spacing:-.06em}
+#identity{font:13px ui-monospace,monospace;color:var(--muted)}
+h1,h2,p{margin:0}
+h1{font-size:clamp(28px,5vw,44px);letter-spacing:-.045em;line-height:1.18}
+h2,summary{font-size:18px;font-weight:650}
+label{display:block;font-size:14px;color:var(--muted)}
+button,input,select{font:inherit;color:inherit;border-radius:7px}
+input,select{width:100%;border:1px solid #a8b4a9;background:#fff;padding:10px;margin:5px 0 12px;min-height:44px}
+button{background:#fff;border:1px solid var(--line);min-height:44px;padding:8px 15px;cursor:pointer}
+button:hover:enabled{border-color:var(--ink)}
+button:focus-visible,input:focus-visible,summary:focus-visible,select:focus-visible{outline:3px solid #678634;outline-offset:2px}
+button[aria-pressed=true],button.primary{background:var(--ink);color:white;border-color:var(--ink)}
+button:disabled{opacity:.45;cursor:default}
+[hidden]{display:none!important}
+#pairing{max-width:390px;margin:clamp(45px,10vh,110px) auto}
+#pairing p{margin:15px 0 24px;color:var(--muted)}
+#pairing input{font:26px ui-monospace,monospace;letter-spacing:.24em}
+#pairing button{width:100%}
+#connected{padding:30px 0}
+.heading,.meta{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.layout{display:grid;grid-template-columns:1fr 1fr;gap:clamp(18px,4vw,40px);margin:24px 0}
+.screen{background:var(--ink);border-radius:14px;padding:18px;display:grid;place-items:center;aspect-ratio:2/1;color:#cedbd1}
+.screen>*{grid-area:1/1}
+canvas{width:100%;height:auto;image-rendering:pixelated}
+.meta{font-size:14px;color:var(--muted);margin:8px 0}
+.buttons{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 17px}
+.buttons button{flex:1 0 auto}
+details{border-top:1px solid var(--line);padding:14px 0}
+summary{cursor:pointer}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:14px;margin-top:12px}
+#wifiStatus{color:var(--muted);font-size:14px}
+#feedback{position:sticky;bottom:12px;background:var(--accent);color:var(--ink);border-radius:8px;padding:10px 16px;margin:12px auto;max-width:620px}
+#feedback:empty{display:none}
+@media(max-width:640px){.layout{grid-template-columns:1fr}.fields{gap:4px}.heading button{padding:6px 10px}}
+</style>
+<header><strong>C3 GameBox</strong><span id="identity"></span></header>
+<main>
+  <form id="pairing">
+    <h1>连接设备</h1>
+    <p>在设备的 Network 页面按 Up 取得六位配对码。</p>
+    <label for="code">配对码</label>
+    <input id="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required>
+    <button id="pairSubmit" class="primary" type="submit" disabled>配对并连接</button>
+    <noscript>启用 JavaScript 后可配对。</noscript>
+  </form>
+  <section id="connected" hidden>
+    <div class="heading"><h1>桌宠控制台</h1><button id="logout">退出配对</button></div>
+    <div class="layout">
+      <div>
+        <div class="screen"><canvas id="screen" width="128" height="64" aria-label="设备当前的桌宠画面" hidden></canvas><span id="empty">选择造型以打开桌宠</span></div>
+        <div class="meta"><span id="petState"></span><button id="closePet">退出桌宠</button></div>
+      </div>
+      <div><h2>造型</h2><div id="styles" class="buttons"></div>
+        <h2>动作</h2><div id="actions" class="buttons"></div></div>
+    </div>
+    <details><summary>显示设置</summary><div class="fields">
+      <label>亮度<select id="brightness"><option>低</option><option>中</option><option>高</option><option>最高</option></select></label>
+      <label>菜单动画<select id="motion"><option>关闭</option><option>简化</option><option>完整</option></select></label>
+      <label>主页标题<select id="header"><option>时间</option><option>日期</option><option>桌宠</option><option>标题</option></select></label>
+    </div></details>
+    <details><summary>Wi-Fi 配网</summary>
+      <form id="wifiForm"><div class="fields">
+        <label>网络名称 (SSID)<input id="ssid" autocomplete="off" required></label>
+        <label>密码（开放网络留空）<input id="password" type="password" autocomplete="new-password"></label>
+      </div><button id="join" type="submit">试连并保存</button> <button id="reconnect" type="button">重连已配置的网络</button></form>
+      <p id="wifiStatus"></p>
+    </details>
+  </section>
+  <p id="feedback" role="status" aria-live="polite"></p>
+</main>
+<script src="/app.js" defer></script>
+</html>

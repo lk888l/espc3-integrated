@@ -1,0 +1,21 @@
+<form wx:if="{{!connected}}" bindsubmit="connect">
+  <label>设备 IP<input name="ip" value="192.168.4.1"/></label>
+  <label>配对码<input name="code" type="number" maxlength="6" placeholder="在设备 Network 页按 Up"/></label>
+  <button form-type="submit" disabled="{{busy}}">连接设备</button>
+</form>
+<block wx:else>
+  <text>{{summary}}</text>
+  <text>造型</text>
+  <view class="choices">
+    <button wx:for="{{styles}}" wx:key="*this" data-index="{{index}}" bindtap="setStyle"
+            class="{{active && index === style ? 'selected' : ''}}" disabled="{{busy}}">{{item}}</button>
+  </view>
+  <text>动作</text>
+  <view class="choices">
+    <button wx:for="{{actionLabels}}" wx:key="*this" data-index="{{index}}" bindtap="act"
+            disabled="{{busy || !active}}">{{item}}</button>
+  </view>
+  <button bindtap="closePet" disabled="{{busy || !active}}">退出桌宠</button>
+  <button bindtap="logout" disabled="{{busy}}">断开配对</button>
+</block>
+<text role="status">{{message}}</text>

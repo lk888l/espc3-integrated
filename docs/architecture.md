@@ -1,7 +1,7 @@
 # 架构
 
 保留 ESP-IDF 模板的 AppModule / AppManager / AppTask 生命周期。
-主入口只做组合，初始化顺序 Storage → Network → Probe → PC Monitor → Input → UI → Console，
+主入口只做组合，初始化顺序 Storage → Network → Probe → PC Monitor → Input → UI → Console → Local API，
 失败时反序清理。任务不能停止时保留模块及运行时存储，避免释放仍在使用的对象。
 
 ## 模式与边界
@@ -27,6 +27,7 @@ NVS 初始化失败会报告错误，不自动擦除已有配置。
 | buttons | 6 | 3072 | 默认 5 ms，读取 GPIO 并识别事件 |
 | oled_ui | 4 | 8192 | 默认 5 ms，唯一 UI/屏幕/游戏/Piano PWM 所有者 |
 | network | 3 | 4096 | 25 ms，重连、凭据、SNTP |
+| httpd | 3 | 6656 | 本地网页、客户端配对、请求解析、UI 请求回执 |
 | wifi_dap | 2 | 6144 | 2 ms 轮询，唯一 DAP/SWD 所有者 |
 | pc_monitor | 2 | 6144 | 25 ms 轮询 UDP 4443、限长解析、最新值快照及 ACK |
 | console | 2 | 4096 | 有限时 USB 读取，命令提交请求 |
@@ -77,6 +78,8 @@ SSD1306 当前接线没有回读/ACK，SPI 成功不代表屏幕接好，
 UiTask 每 250 ms 在网络快照赋值后合并电脑监控快照，统一绘制 Tools → PC Monitor。
 监控与菜单/USB会话独立；Wi-Fi 关闭时释放 socket，恢复后重新监听，超过 3 秒数据标记过期。
 STA 从 1 s 退避到最多 60 s，AP 保持可访问；RSSI 每秒更新。
+HTTP 配网使用单个试连槽。network 任务验证新的关联和 DHCP 后提交原有 NVS 凭据记录，
+失败、超时或关闭 Wi-Fi 时恢复上次配置。AppManager 的 process 轮询维护 HTTP 服务和 UDP 发现。
 分别跟踪连接中、已关联、已获得 IP，避免 DHCP 等待期间重复调用 connect。
 关联与 DHCP 分别有 15 s / 30 s 截止时间，过期后断开并退避重试。
 SNTP 获得 IP 后启动，回调记录真实同步时间，按 POSIX 时区显示。
@@ -113,6 +116,8 @@ GPIO LL 访问限制在输入与 SWD 适配器，升级 SDK 后需复核。
 PetSession 借用 UI 所有者持有的 PetPack，Model 栈不包含大块动画存储。
 
 USB `pet` 命令通过请求/结果队列将样式、动作和资源安装交给 UI 唯一所有者。
+HTTP 桌宠和显示设置复用这条队列，发送方通过互斥量和请求 ID 匹配回执。
+UI 在发布状态后确认命令，单独提供当前桌宠的 1024 字节画面供配对客户端读取。
 包在 console 任务的暂存区顺序接收，验证大小、CRC32、schema 后一次写入 NVS，
 再把所有权交给 UI；中断或无效上传不替换当前宠物。快照仅包含样式、动作、序号、
 资源长度，console 不并发读取渲染中的包。选择样式由 storage 任务合并保存。

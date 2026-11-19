@@ -7,7 +7,6 @@ import re
 import time
 
 import serial
-from esptool.reset import HardReset
 
 
 class MonitorSerial(serial.Serial):
@@ -45,7 +44,7 @@ class Device:
 
     def record(self, data):
         text = data.decode("utf-8", errors="replace")
-        text = re.sub(r"(KEY:\s*)\S+", r"\1<redacted>", text)
+        text = re.sub(r"((?:KEY|PAIR CODE):\s*)\S+", r"\1<redacted>", text)
         self.log.write(text)
         self.log.flush()
         for bad in ("Guru Meditation", "Stack canary", "assert failed", "Brownout"):
@@ -87,6 +86,7 @@ class Device:
         time.sleep(0.012)
 
     def reset(self):
+        from esptool.reset import HardReset
         self.port.allow_modem_control = True
         try:
             HardReset(self.port, uses_usb=True)()

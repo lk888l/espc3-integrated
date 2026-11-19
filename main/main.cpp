@@ -21,7 +21,8 @@ extern "C" void app_main()
     if (!add(c3::device::create_storage(runtime)) || !add(c3::device::create_network()) ||
         !add(c3::device::create_probe()) || !add(c3::device::create_pc_monitor()) ||
         !add(c3::device::create_input(runtime)) ||
-        !add(c3::device::create_ui(runtime)) || !add(c3::device::create_console(runtime)))
+        !add(c3::device::create_ui(runtime)) || !add(c3::device::create_console(runtime)) ||
+        !add(c3::device::create_local_api(runtime)))
         return;
     const auto result = manager.initialize_all();
     if (!result)

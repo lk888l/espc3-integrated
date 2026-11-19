@@ -6,6 +6,7 @@
 #include "c3/board.hpp"
 #include "c3/device_app.hpp"
 #include "c3/network.hpp"
+#include "c3/pairing.hpp"
 #include "c3/probe.hpp"
 #include "c3/pc_monitor_service.hpp"
 #include "driver/usb_serial_jtag.h"
@@ -88,6 +89,18 @@ int status_command(int, char**)
 }
 int wifi_command(int argc, char** argv)
 {
+    if (argc == 2 && !std::strcmp(argv[1], "pair"))
+    {
+        if (!network::enabled_requested()) { std::puts("Enable Wi-Fi first"); return 1; }
+        std::printf("PAIR CODE: %06lu\n", (unsigned long)pairing::open());
+        return 0;
+    }
+    if (argc == 2 && !std::strcmp(argv[1], "revoke"))
+    {
+        pairing::revoke_all();
+        std::puts("Client sessions revoked");
+        return 0;
+    }
     if (argc == 2 && !std::strcmp(argv[1], "on"))
     {
         network::set_enabled(true);
@@ -103,7 +116,7 @@ int wifi_command(int argc, char** argv)
     {
         if (!network::set_credentials(argv[2], argc == 4 ? argv[3] : ""))
         {
-            std::printf("Invalid credentials: SSID 1..32 bytes, password empty or 8..63 bytes\n");
+            std::puts("Station configuration busy or invalid (SSID 1..32 bytes, password empty or 8..63 bytes)");
             return 1;
         }
         network::set_enabled(true);
@@ -113,7 +126,8 @@ int wifi_command(int argc, char** argv)
     const auto net = network::snapshot();
     std::printf("AP: %s  KEY: %s  IP: %s  STA: %s\n", net.ap_ssid, net.ap_password, net.ap_ip,
                 net.sta_ip);
-    std::printf("wifi on|off; wifi set \"SSID\" \"PASSWORD\"\n");
+    if (const auto code = pairing::visible_code()) std::printf("PAIR CODE: %06lu\n", (unsigned long)code);
+    std::printf("wifi on|off|pair|revoke; wifi set \"SSID\" \"PASSWORD\"\n");
     return argc == 1 ? 0 : 1;
 }
 int ntp_command(int, char**)
@@ -281,7 +295,7 @@ class ConsoleModule final : public AppModule
                                                .context = nullptr},
                                               {.command = "wifi",
                                                .help = "Wi-Fi status, on/off or set credentials",
-                                               .hint = "on|off|set SSID PASSWORD",
+                                               .hint = "on|off|pair|revoke|set SSID PASSWORD",
                                                .func = wifi_command,
                                                .argtable = nullptr,
                                                .func_w_context = nullptr,

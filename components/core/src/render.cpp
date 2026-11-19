@@ -390,17 +390,21 @@ void view(Canvas& c, const Model& m, const Telemetry& t, View v, int x, uint32_t
             {
                 std::snprintf(buffer, sizeof(buffer), "AP %s", t.ap_ssid);
                 c.text(x + 4, 14, buffer);
-                std::snprintf(buffer, sizeof(buffer), "KEY %s", t.ap_password);
+                if (t.pairing_code)
+                    std::snprintf(buffer, sizeof(buffer), "PAIR CODE %06lu", (unsigned long)t.pairing_code);
+                else
+                    std::snprintf(buffer, sizeof(buffer), "KEY %s", t.ap_password);
                 c.text(x + 4, 24, buffer);
                 std::snprintf(buffer, sizeof(buffer), "IP %s", t.ap_ip);
                 c.text(x + 4, 34, buffer);
                 if (t.station_connected)
                     std::snprintf(buffer, sizeof(buffer), "STA %s", t.sta_ip);
                 else
-                    std::snprintf(buffer, sizeof(buffer), "STA OFF / USB CFG");
+                    std::snprintf(buffer, sizeof(buffer), "STA %s", t.provisioning == ProvisionState::trying
+                                                       ? "CONNECTING" : "OFF / USE AP");
                 c.text(x + 4, 44, buffer);
             }
-            footer(c, x, "OK SYNC  BACK EXIT");
+            footer(c, x, t.wifi_enabled ? "UP PAIR  DOWN REVOKE" : "BACK EXIT");
             break;
         case View::stopwatch:
         {

@@ -6,6 +6,7 @@
 #include "c3/board.hpp"
 #include "c3/device_app.hpp"
 #include "c3/network.hpp"
+#include "c3/pairing.hpp"
 #include "c3/oled.hpp"
 #include "c3/probe.hpp"
 #include "c3/pc_monitor_service.hpp"
@@ -312,6 +313,8 @@ class UiTask final : public AppTask
             network::set_enabled(enabled);
         }
         if (flags & sync_time) network::sync_time();
+        if ((flags & pair_client) && network::enabled_requested()) pairing::open();
+        if (flags & revoke_clients) pairing::revoke_all();
         if (flags & set_probe_clock) dap::set_clock_limit(model.probe_clock());
         if (flags & start_probe)
         {
@@ -338,27 +341,31 @@ class UiTask final : public AppTask
         while (!should_exit())
         {
             const uint32_t now = now_ms();
-            std::array<PetResult, 4> pet_results{};
-            unsigned pet_count = 0;
-            for (; pet_count < pet_results.size(); ++pet_count)
+            std::array<UiReply, 4> replies{};
+            unsigned reply_count = 0;
+            for (; reply_count < replies.size(); ++reply_count)
             {
-                PetRequest request;
-                if (xQueueReceive(runtime_.pet_requests, &request, 0) != pdTRUE) break;
+                UiRequest request;
+                if (xQueueReceive(runtime_.ui_requests, &request, 0) != pdTRUE) break;
                 bool ok = true;
                 switch (request.operation)
                 {
-                    case PetOperation::open:
+                    case UiOperation::open_pet:
                         ok = model.pet().select(request.value, now);
-                        if (ok) model.open(View::pet);
+                        if (ok)
+                        {
+                            model.open(View::pet);
+                            if (request.action != PetAction::count) model.pet().act(request.action, now);
+                        }
                         break;
-                    case PetOperation::action:
+                    case UiOperation::pet_action:
                         ok = model.view() == View::pet && request.value < unsigned(PetAction::count);
                         if (ok) model.pet().act(PetAction(request.value), now);
                         break;
-                    case PetOperation::close:
+                    case UiOperation::close_pet:
                         if (model.view() == View::pet) model.open(View::home, false);
                         break;
-                    case PetOperation::install:
+                    case UiOperation::install_pet:
                         ok = request.pack != nullptr;
                         if (ok)
                         {
@@ -368,8 +375,19 @@ class UiTask final : public AppTask
                             model.open(View::pet);
                         }
                         break;
+                    case UiOperation::settings:
+                    {
+                        Settings next = model.settings();
+                        const auto& patch = request.display;
+                        if (patch.motion >= 0) next.motion = Motion(patch.motion);
+                        if (patch.brightness >= 0) next.brightness = uint8_t(patch.brightness);
+                        if (patch.header >= 0) next.header = Header(patch.header);
+                        ok = next.valid();
+                        if (ok) model.set_settings(next);
+                        break;
+                    }
                 }
-                pet_results[pet_count] = {request.id, ok};
+                replies[reply_count] = {request.id, ok};
             }
             for (unsigned i = 0; i < 64; ++i)
             {
@@ -389,6 +407,7 @@ class UiTask final : public AppTask
             if (now - network_at >= 250)
             {
                 telemetry = network::snapshot();
+                telemetry.pairing_code = pairing::visible_code();
                 telemetry.pc = pc::snapshot();
                 network_at = now;
             }
@@ -445,10 +464,11 @@ class UiTask final : public AppTask
                                  model.game().tetris_rotation(), model.game().tetris_piece(),
                                  model.pet().style(), uint8_t(model.pet().action()),
                                  model.pet().sequence(),
-                                 uint32_t(runtime_.pet_pack ? runtime_.pet_pack->size() : 0)});
+                                 uint32_t(runtime_.pet_pack ? runtime_.pet_pack->size() : 0)},
+                                model.view() == View::pet && !broken ? &frame_ : nullptr);
             runtime_.pet_style = model.pet().style();
-            for (unsigned i = 0; i < pet_count; ++i)
-                xQueueSend(runtime_.pet_results, &pet_results[i], 0);
+            for (unsigned i = 0; i < reply_count; ++i)
+                xQueueSend(runtime_.ui_replies, &replies[i], 0);
             runtime_.frames = oled_.frames;
             runtime_.skipped = oled_.skipped;
             runtime_.display_errors = oled_.errors;
@@ -472,27 +492,33 @@ class UiModule final : public AppModule
     UiTask task_;
     bool on_initialize() override
     {
-        runtime_.pet_requests = xQueueCreate(4, sizeof(PetRequest));
-        runtime_.pet_results = xQueueCreate(4, sizeof(PetResult));
-        if (!runtime_.pet_requests || !runtime_.pet_results) return false;
+        runtime_.ui_requests = xQueueCreate(4, sizeof(UiRequest));
+        runtime_.ui_replies = xQueueCreate(4, sizeof(UiReply));
+        runtime_.ui_sender = xSemaphoreCreateMutex();
+        if (!runtime_.ui_requests || !runtime_.ui_replies || !runtime_.ui_sender) return false;
         return oled_.initialize(runtime_.initial_settings.contrast()) == ESP_OK &&
                audio_.initialize() && task_.start();
     }
     bool on_deinitialize() override
     {
         if (!task_.stop()) return false;
-        if (runtime_.pet_requests)
+        if (runtime_.ui_requests)
         {
-            PetRequest request;
-            while (xQueueReceive(runtime_.pet_requests, &request, 0) == pdTRUE)
+            UiRequest request;
+            while (xQueueReceive(runtime_.ui_requests, &request, 0) == pdTRUE)
                 delete request.pack;
-            vQueueDelete(runtime_.pet_requests);
-            runtime_.pet_requests = nullptr;
+            vQueueDelete(runtime_.ui_requests);
+            runtime_.ui_requests = nullptr;
         }
-        if (runtime_.pet_results)
+        if (runtime_.ui_replies)
         {
-            vQueueDelete(runtime_.pet_results);
-            runtime_.pet_results = nullptr;
+            vQueueDelete(runtime_.ui_replies);
+            runtime_.ui_replies = nullptr;
+        }
+        if (runtime_.ui_sender)
+        {
+            vSemaphoreDelete(runtime_.ui_sender);
+            runtime_.ui_sender = nullptr;
         }
         audio_.deinitialize();
         return oled_.deinitialize();

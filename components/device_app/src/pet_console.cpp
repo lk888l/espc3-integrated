@@ -13,14 +13,12 @@ namespace c3::device
 {
 namespace
 {
-constexpr const char* actions[] = {"idle", "blink", "happy", "eat", "sleep", "surprised", "sad", "dance"};
 struct Upload
 {
     std::unique_ptr<uint8_t[]> data;
     uint32_t size = 0, received = 0, crc = 0, touched = 0;
 };
 Upload upload;
-uint32_t request_id = 0;
 uint32_t now_ms() { return uint32_t(esp_timer_get_time() / 1000); }
 int fail(const char* reason)
 {
@@ -60,27 +58,6 @@ uint32_t crc32(std::span<const uint8_t> bytes)
     }
     return crc ^ 0xffffffffU;
 }
-bool apply(Runtime& runtime, PetOperation operation, uint8_t value = 0,
-           std::unique_ptr<PetPack> pack = {})
-{
-    if (!runtime.pet_requests || !runtime.pet_results) return false;
-    PetResult result;
-    while (xQueueReceive(runtime.pet_results, &result, 0) == pdTRUE) {}
-    const PetRequest request{operation, value, ++request_id, pack.get()};
-    if (xQueueSend(runtime.pet_requests, &request, pdMS_TO_TICKS(100)) != pdTRUE) return false;
-    pack.release();
-    const auto started = xTaskGetTickCount();
-    const auto timeout = pdMS_TO_TICKS(1500);
-    while (true)
-    {
-        const auto elapsed = xTaskGetTickCount() - started;
-        if (elapsed >= timeout) break;
-        const auto left = timeout - elapsed;
-        if (xQueueReceive(runtime.pet_results, &result, left) != pdTRUE) break;
-        if (result.id == request.id) return result.ok;
-    }
-    return false;
-}
 }  // namespace
 
 int pet_command(Runtime& runtime, int argc, char** argv)
@@ -89,7 +66,7 @@ int pet_command(Runtime& runtime, int argc, char** argv)
     if (argc == 2 && !std::strcmp(argv[1], "status"))
     {
         const auto ui = runtime.ui_snapshot();
-        const auto action = ui.pet_action < std::size(actions) ? actions[ui.pet_action] : "idle";
+        const auto action = pet_action_name(PetAction(ui.pet_action)).data();
         std::printf("pet_ok status active=%u style=%u action=%s sequence=%lu custom=%u bytes=%lu\n",
                     ui.view == View::pet, ui.pet_style, action, (unsigned long)ui.pet_sequence,
                     ui.pet_bytes != 0, (unsigned long)ui.pet_bytes);
@@ -99,22 +76,24 @@ int pet_command(Runtime& runtime, int argc, char** argv)
     {
         uint32_t style;
         if (!number(argv[2], style) || style > 4) return fail("invalid_style");
-        if (!apply(runtime, PetOperation::open, uint8_t(style))) return fail("style_unavailable_or_busy");
+        if (apply_ui(runtime, {UiOperation::open_pet, uint8_t(style)}) != ApplyResult::applied)
+            return fail("style_unavailable_or_busy");
         std::printf("pet_ok open style=%lu\n", (unsigned long)style);
         return 0;
     }
     if (argc == 3 && !std::strcmp(argv[1], "action"))
     {
         unsigned action = 0;
-        while (action < std::size(actions) && std::strcmp(argv[2], actions[action])) ++action;
-        if (action == std::size(actions)) return fail("invalid_action");
-        if (!apply(runtime, PetOperation::action, uint8_t(action))) return fail("pet_inactive_or_busy");
-        std::printf("pet_ok action %s\n", actions[action]);
+        while (action < unsigned(PetAction::count) && argv[2] != pet_action_name(PetAction(action))) ++action;
+        if (action == unsigned(PetAction::count)) return fail("invalid_action");
+        if (apply_ui(runtime, {UiOperation::pet_action, uint8_t(action)}) != ApplyResult::applied)
+            return fail("pet_inactive_or_busy");
+        std::printf("pet_ok action %s\n", argv[2]);
         return 0;
     }
     if (argc == 2 && !std::strcmp(argv[1], "close"))
     {
-        if (!apply(runtime, PetOperation::close)) return fail("busy");
+        if (apply_ui(runtime, {UiOperation::close_pet}) != ApplyResult::applied) return fail("busy");
         std::printf("pet_ok close\n");
         return 0;
     }
@@ -172,7 +151,8 @@ int pet_command(Runtime& runtime, int argc, char** argv)
         }
         if (result != ESP_OK) return fail("storage_failed");
         const auto size = upload.size, crc = upload.crc;
-        if (!apply(runtime, PetOperation::install, 4, std::move(pack))) return fail("saved_apply_failed");
+        if (apply_ui(runtime, {UiOperation::install_pet}, std::move(pack)) != ApplyResult::applied)
+            return fail("saved_apply_failed");
         upload = {};
         std::printf("pet_ok commit bytes=%lu crc=%08lx\n", (unsigned long)size, (unsigned long)crc);
         return 0;
