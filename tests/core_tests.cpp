@@ -104,6 +104,87 @@ void spring_tests()
     signature.step(Motion::full);
     assert(signature.value() == 17);  // same 62/184 Q24.8 integrator as GameBox
 }
+void home_carousel_tests()
+{
+    constexpr int width = HomeCarousel::card_width;
+    const auto pixels = [](const Model& model)
+    {
+        Frame frame;
+        render(frame, model, {}, 600);
+        return frame;
+    };
+    Model off(Settings{.motion = Motion::off});
+    off.tick(0);
+    off.tick(600);
+    std::vector<Frame> cards;
+    for (unsigned i = 0; i < menu(View::home).size(); ++i)
+    {
+        assert(off.selected(View::home) == i && off.motion().carousel.settled());
+        cards.push_back(pixels(off));
+        off.handle({Key::down, Gesture::pressed, 600, 0});
+    }
+    assert(pixels(off) == cards.front() && cards.front() != cards.back());
+
+    for (const auto speed : {Motion::full, Motion::reduced})
+    {
+        Model model(Settings{.motion = speed});
+        uint32_t now = 600;
+        model.tick(0);
+        model.tick(now);
+        const int duration = speed == Motion::full ? 288 : 144;
+        // Slide across the wrap in both directions. Check every framebuffer column
+        // against the corresponding strip of the two stationary cards.
+        for (const auto key : {Key::up, Key::down})
+        {
+            const bool forward = key == Key::down;
+            const auto& from = forward ? cards.back() : cards.front();
+            const auto& to = forward ? cards.front() : cards.back();
+            model.handle({key, Gesture::pressed, now, 0});
+            assert(pixels(model) == from);
+            int previous = 0;
+            for (int ms = 8; ms <= duration; ms += 8)
+            {
+                model.tick(now += 8);
+                const int offset = model.motion().carousel.offset();
+                const int travel = forward ? width - offset : width + offset;
+                assert(travel >= previous && travel <= width);
+                if (ms == duration / 2) assert(travel == width / 2);
+                const int shift = forward ? travel : width - travel;
+                const auto frame = pixels(model);
+                for (std::size_t i = 0; i < frame.size(); ++i)
+                {
+                    const int col = int(i % width) + shift;
+                    const auto& card = col < width ? cards.back() : cards.front();
+                    assert(frame[i] == card[i / width * width + col % width]);
+                }
+                previous = travel;
+            }
+            assert(model.motion().carousel.settled() && pixels(model) == to);
+        }
+
+        const auto move = [&](Key key)
+        {
+            const auto visible = pixels(model);
+            model.handle({key, Gesture::pressed, now, 0});
+            assert(pixels(model) == visible);
+        };
+        move(Key::down);
+        model.tick(now += 48);
+        const auto partial = pixels(model);
+        assert(partial != cards[0] && partial != cards[1]);
+        move(Key::up);  // Reverse partway back to Games.
+        assert(model.motion().carousel.offset() < 0);
+        move(Key::up);  // Retarget beyond Games while both cards are still visible.
+        assert(model.motion().carousel.offset() < -width);
+        for (std::size_t i = 0; i < cards.size(); ++i) move(Key::up);
+        model.tick(now += 32);
+        move(Key::down);
+        move(Key::down);
+        const auto visible = pixels(model);
+        model.handle({Key::enter, Gesture::pressed, now, 0});
+        assert(model.view() == View::tools && pixels(model) == visible);
+    }
+}
 void model_tests()
 {
     Model model;
@@ -255,7 +336,7 @@ void render_tests()
     assert(frame != home);
     for (uint32_t now = 610; now < 1800; now += 5) model.tick(now);
     render(frame, model, telemetry, 1800);
-    assert(model.motion().carousel_x.settled() && frame != home);
+    assert(model.motion().carousel.settled() && frame != home);
     for (unsigned v = 0; v < unsigned(View::count); ++v)
     {
         model.open(View(v));
@@ -314,6 +395,7 @@ int main()
 {
     button_tests();
     spring_tests();
+    home_carousel_tests();
     model_tests();
     exit_button_tests();
     render_tests();

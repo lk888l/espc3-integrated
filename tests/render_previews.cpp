@@ -95,15 +95,16 @@ int main(int argc, char** argv)
     }
     model.open(View::home);
     settle();
-    model.handle({Key::down, Gesture::pressed, ++now, 0});
-    for (unsigned i = 0; i < 32; ++i)
+    for (unsigned i = 0; i < 64; ++i)
     {
-        now += 8;
+        if (i == 0 || i == 32)
+            model.handle({i == 0 ? Key::down : Key::up, Gesture::pressed, now, 0});
         model.tick(now);
         render(frame, model, t, now);
         char name[32];
         std::snprintf(name, sizeof(name), "animation-%02u.pgm", i);
         save(frame, root / name);
+        now += 20;
     }
     model.open(View::pet);
     for (unsigned style = 0; style < PetSession::builtin_styles; ++style)

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Export the actual UI renderer to PNG and GIF with the Python standard library."""
 from pathlib import Path
+from itertools import groupby
 import argparse
 import struct
 import subprocess
@@ -35,8 +36,10 @@ def gif(path, frames, scale=2):
     data = bytearray(b"GIF89a" + struct.pack("<HHBBB", width, height, 0x80, 0, 0))
     data.extend(b"\0\0\0\xff\xff\xff")
     data.extend(b"\x21\xff\x0bNETSCAPE2.0\x03\x01\0\0\0")
-    for frame in frames:
-        data.extend(b"\x21\xf9\x04\x08\x01\0\0\0")
+    # Each renderer sample spans 20 ms. Combine identical frames during the pauses.
+    for frame, samples in groupby(frames):
+        delay_cs = 2 * sum(1 for _ in samples)
+        data.extend(b"\x21\xf9\x04\x08" + struct.pack("<H", delay_cs) + b"\0\0")
         data.extend(b"," + struct.pack("<HHHHB", 0, 0, width, height, 0))
         # Clear between literals to keep valid fixed-width 3-bit LZW codes.
         bits = 0

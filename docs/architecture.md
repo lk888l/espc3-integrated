@@ -45,13 +45,16 @@ Up+Down 保留为两个方向事件，不再合成返回；普通页面长按 En
 
 ## 动画
 
-Q24.8 Spring 移植自 STM-GameBox：
-Full 刚度/阻尼 62/184，Reduced 34/206，Off 直接到目标。
+主页卡片沿水平方向首尾相接。相邻两张卡片同步滑出和滑入，使用两端缓动的三次曲线。
+Full 用时约 288 ms，Reduced 用时约 144 ms，Off 立即切换。
+连按和反向时从当前画面继续移动，Enter 立即打开最近选中的项目。
+
+页面切换、列表光标和滚动使用 STM-GameBox 的 Q24.8 弹簧。
+Full 刚度/阻尼为 62/184，Reduced 为 34/206，Off 直接到目标。
 每 8 ms 推进固定模拟步长，单轮最多追赶 64 ms，错过调度后从当前重新安排。
 5 ms 是 UI 目标调度周期，不是实测可见帧率；面板扫描、渲染、
 Wi-Fi、Flash 和 SPI 都会影响表现。
 
-保留 carousel_x、page_x、cursor_y、cursor_width、scroll_y 五个动画值。
 动画接受新的 Pressed，Released/Click 不重复确认。
 主页六卡片为 Games / Tools / Network / Clock / Settings / Desktop Pet。
 字体、布局和宠物两帧来自相同参考工程。

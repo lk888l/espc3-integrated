@@ -98,9 +98,24 @@ class Spring
    private:
     int32_t position_, target_, velocity_ = 0;
 };
+class HomeCarousel
+{
+   public:
+    static constexpr int card_width = 128;
+    void move(int direction, int card_count, Motion speed);
+    void step(Motion speed);
+    void finish() { remaining_ = 0; }
+    bool settled() const { return remaining_ == 0; }
+    int offset() const;  // Signed distance in pixels from the viewport to the selected card.
+
+   private:
+    static constexpr int steps = 36;  // 288 ms at the menu's 8 ms simulation step.
+    int start_offset_ = 0, remaining_ = 0;
+};
 struct MenuMotion
 {
-    Spring cursor_y{14}, cursor_width{52}, scroll_y{}, page_x{}, carousel_x{};
+    Spring cursor_y{14}, cursor_width{52}, scroll_y{}, page_x{};
+    HomeCarousel carousel;
     void step(Motion speed);
     bool active() const;
 };
@@ -203,8 +218,6 @@ class Model
     bool forward() const { return forward_; }
     bool booting() const { return booting_; }
     uint8_t selected(View v) const { return selection_[unsigned(v)]; }
-    uint8_t previous_card() const { return previous_card_; }
-    int carousel_direction() const { return carousel_direction_; }
     const MenuMotion& motion() const { return motion_; }
     const Settings& settings() const { return settings_; }
     KeyEvent last_event() const { return last_event_; }
@@ -246,9 +259,8 @@ class Model
     MenuMotion motion_;
     View view_ = View::home, previous_view_ = View::home, about_parent_ = View::settings;
     std::array<uint8_t, unsigned(View::count)> selection_{};
-    uint8_t previous_card_ = 0, probe_speed_ = 0;
+    uint8_t probe_speed_ = 0;
     uint8_t pc_monitor_page_ = 0;
-    int carousel_direction_ = 1;
     bool forward_ = true, booting_ = true, have_tick_ = false, probe_wanted_ = false;
     uint16_t effects_ = 0;
     uint32_t now_ = 0, last_tick_ = 0, motion_remainder_ = 0, boot_started_ = 0;

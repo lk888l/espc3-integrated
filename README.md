@@ -75,7 +75,7 @@ menuconfig → C3 GameBox → Board wiring 中设置 `C3_BUZZER_GPIO`，默认 -
 
 ![菜单](docs/previews/menu.png)
 
-![卡片弹簧动画](docs/previews/menu.gif)
+![主页卡片向左、向右滑动切换](docs/previews/menu.gif)
 
 ## 默认接线
 

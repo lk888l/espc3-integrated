@@ -10,7 +10,7 @@ NVS、Wi-Fi STA、自动/手动校时及无线 DAP 协议。见[验证记录](va
 1. 核对 3V3/GND 供电，SCLK 接 GPIO4、MOSI 接 GPIO6、DC 接 GPIO10、RES 接 GPIO5，CS# 直接接 GND。模块设为四线 SPI。
 2. 检查开机、六张主页卡片、列表、Clock/Network 显示。
 3. 动画中快速导航、Enter 确认应有效。
-4. 比较 Full/Reduced/Off 与 STM-GameBox 的回弹、滑入、光标形态。
+4. 在 Full 和 Reduced 下双向切换主页卡片，观察旧卡滑出、新卡滑入并停稳，包含首尾切换。Off 应立即显示选中卡片。进入列表页后检查光标回弹。
 5. System 的 SPI 耗时与计数不是面板可见刷新率。
 6. 段/COM 映射采用与参考一致的 A1/C8；方向不符时核对面板。
 7. SPI 无 ACK，全黑时查接线、供电、SPI 跳线与焊接。

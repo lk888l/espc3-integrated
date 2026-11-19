@@ -68,18 +68,22 @@ void Canvas::rounded(int x, int y, int w, int h, PixelOp op, bool fill)
         rect(x, y, w, h, op, fill);
         return;
     }
-    const auto inside = [=](int px, int py)
-    {
-        const int lx = px - x, ly = py - y;
-        if (lx < 0 || ly < 0 || lx >= w || ly >= h) return false;
-        const int ex = std::min(lx, w - 1 - lx), ey = std::min(ly, h - 1 - ly);
-        return !((ex == 0 && ey < 2) || (ey == 0 && ex < 2));
-    };
     for (int py = std::max(y, top_); py < std::min(y + h, bottom_); ++py)
-        for (int px = std::max(x, left_); px < std::min(x + w, right_); ++px)
-            if (inside(px, py) && (fill || !inside(px - 1, py) || !inside(px + 1, py) ||
-                                   !inside(px, py - 1) || !inside(px, py + 1)))
+    {
+        const int edge = std::min(py - y, y + h - 1 - py);
+        const int inset = std::max(0, 2 - edge);
+        const int left = x + inset, right = x + w - inset;
+        if (fill || edge == 0)
+        {
+            for (int px = std::max(left, left_); px < std::min(right, right_); ++px)
                 pixel(px, py, op);
+        }
+        else
+        {
+            pixel(left, py, op);
+            pixel(right - 1, py, op);
+        }
+    }
 }
 void Canvas::text(int x, int y, std::string_view str, bool inverted, int scale)
 {
@@ -333,14 +337,13 @@ void view(Canvas& c, const Model& m, const Telemetry& t, View v, int x, uint32_t
     char buffer[80]{};
     if (v == View::home)
     {
-        if (interactive && !m.motion().carousel_x.settled())
-        {
-            const int offset = m.motion().carousel_x.value();
-            home_card(c, m, t, m.previous_card(), x + offset - m.carousel_direction() * 128, now);
-            home_card(c, m, t, m.selected(v), x + offset, now);
-        }
-        else
-            home_card(c, m, t, m.selected(v), x, now);
+        constexpr int width = HomeCarousel::card_width;
+        const int count = int(menu(v).size()), track_width = count * width;
+        const int scroll =
+            (m.selected(v) * width - m.motion().carousel.offset() + track_width) % track_width;
+        const int first = scroll / width, left = x - scroll % width;
+        home_card(c, m, t, first, left, now);
+        if (left < x) home_card(c, m, t, (first + 1) % count, left + width, now);
         return;
     }
     if (!menu(v).empty())

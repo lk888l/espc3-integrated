@@ -114,18 +114,35 @@ void Spring::step(Motion speed)
         velocity_ = 0;
     }
 }
+void HomeCarousel::move(int direction, int card_count, Motion speed)
+{
+    // Rebase the visible strip on the new selection. Whole turns show the same pixels.
+    start_offset_ = (offset() + direction * card_width) % (card_count * card_width);
+    remaining_ = speed != Motion::off && start_offset_ != 0 ? steps : 0;
+}
+void HomeCarousel::step(Motion speed)
+{
+    const int ticks = speed == Motion::full ? 1 : 2;
+    remaining_ = speed == Motion::off ? 0 : std::max(0, remaining_ - ticks);
+}
+int HomeCarousel::offset() const
+{
+    // Smoothstep of the remaining time, from the starting offset to exactly zero.
+    const int weight = remaining_ * remaining_ * (3 * steps - 2 * remaining_);
+    return start_offset_ * weight / (steps * steps * steps);
+}
 void MenuMotion::step(Motion speed)
 {
     cursor_y.step(speed);
     cursor_width.step(speed);
     scroll_y.step(speed);
     page_x.step(speed);
-    carousel_x.step(speed);
+    carousel.step(speed);
 }
 bool MenuMotion::active() const
 {
     return !cursor_y.settled() || !cursor_width.settled() || !scroll_y.settled() ||
-           !page_x.settled() || !carousel_x.settled();
+           !page_x.settled() || !carousel.settled();
 }
 std::span<const Entry> menu(View view)
 {
@@ -299,15 +316,9 @@ void Model::move(int d)
     const auto entries = menu(view_);
     if (entries.empty()) return;
     auto& selected = selection_[unsigned(view_)];
-    const uint8_t old = selected;
     selected = uint8_t((int(selected) + d + int(entries.size())) % int(entries.size()));
     if (view_ == View::home)
-    {
-        previous_card_ = old;
-        carousel_direction_ = d;
-        motion_.carousel_x.snap(int16_t(d * 128));
-        motion_.carousel_x.target(0);
-    }
+        motion_.carousel.move(d, int(entries.size()), settings_.motion);
     else
         update_targets();
 }
@@ -392,7 +403,7 @@ void Model::open(View next, bool forward)
     if (next == View::pet) pet_.select(pet_.style(), now_);
     if (next == View::pc_monitor) pc_monitor_page_ = 0;
     forward_ = forward;
-    motion_.carousel_x.snap(0);
+    if (next == View::home || next == View::pet) motion_.carousel.finish();
     motion_.page_x.snap(int16_t(forward ? 128 : -128));
     motion_.page_x.target(0);
     if (next == View::pet || previous_view_ == View::pet) motion_.page_x.snap(0);
